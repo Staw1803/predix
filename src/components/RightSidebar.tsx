@@ -14,7 +14,7 @@ export default function RightSidebar() {
     },
     {
       id: '3',
-      tag: '#StripePix',
+      tag: '#EfiPix',
       postsCount: '512 posts',
     },
     {

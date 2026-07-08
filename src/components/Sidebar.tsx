@@ -1,4 +1,4 @@
-import { Home, User, TrendingUp } from 'lucide-react';
+import { Home, User, TrendingUp, ShoppingBag } from 'lucide-react';
 
 interface SidebarProps {
   credits: number;
@@ -12,6 +12,7 @@ interface SidebarProps {
 export default function Sidebar({ credits, activeTab, setActiveTab, username, userHandle, userAvatar }: SidebarProps) {
   const menuItems = [
     { id: 'feed', name: 'Início', icon: Home },
+    { id: 'store', name: 'Loja', icon: ShoppingBag },
     { id: 'profile', name: 'Perfil', icon: User },
   ];
 

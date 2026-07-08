@@ -16,7 +16,7 @@
     "lucide-react": "^1.23.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "stripe": "^22.3.0",
+    "sdk-node-apis-efi": "^1.4.0",
     "tailwindcss": "^4.3.2"
   },
   "devDependencies": {
