@@ -11,6 +11,7 @@ import { resolvePost } from './services/postResolverService';
 import { 
   doc, 
   getDoc, 
+  setDoc,
   collection, 
   getDocs, 
   updateDoc, 
@@ -138,23 +139,35 @@ function App() {
         setEditBio(data.bio || '');
         setEditAvatarUrl(data.avatar_url || '');
       } else {
+        // Auto-create missing profile in database to heal old or partial session states
+        const usernameVal = session?.email?.split('@')[0] || 'user';
         const fallbackProfile = {
           id: userId,
-          username: session?.email?.split('@')[0] || 'user',
-          display_name: session?.displayName || session?.email?.split('@')[0] || 'User',
+          username: usernameVal,
+          display_name: session?.displayName || usernameVal,
           balance: 1000,
           total_deposited: 0,
           total_wagered: 0,
           win_rate: 0,
           total_bets: 0,
           total_earnings: 0,
-          bio: 'Palpitador no Predix.'
+          wins_count: 0,
+          bio: 'Palpitador no Predix.',
+          updated_at: new Date()
         };
+
+        // Write the new document to Firestore
+        await setDoc(doc(db, 'profiles', userId), fallbackProfile);
+
         setProfile(fallbackProfile);
         setBalance(1000);
       }
     } catch (err: any) {
       console.error('Error fetching profile:', err.message);
+      setToast({ 
+        message: `Erro de Banco de Dados: ${err.message}. Verifique se ativou as Regras do Firestore (Rules) no seu console.`, 
+        type: 'error' 
+      });
     }
   };
 
