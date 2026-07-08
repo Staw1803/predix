@@ -25,6 +25,9 @@ export default async function handler(req, res) {
 
     const client_id = process.env.VITE_EFI_CLIENT_ID;
     const client_secret = process.env.VITE_EFI_CLIENT_SECRET;
+    const cert_base64 = process.env.VITE_EFI_CERTIFICATE_BASE64;
+    const isSandbox = process.env.VITE_EFI_SANDBOX !== 'false';
+    const pixKey = process.env.VITE_EFI_PIX_KEY || 'sandbox-pix-key@efi.com.br';
 
     if (!client_id || !client_secret) {
       throw new Error("Missing Efí Bank environment keys.");
@@ -35,11 +38,11 @@ export default async function handler(req, res) {
 
     // Efi Pay options
     const options = {
-      sandbox: true,
+      sandbox: isSandbox,
       client_id: client_id,
       client_secret: client_secret,
-      certificate: '', // We don't have the certificate file, but we construct options as required
-      cert_base64: false
+      certificate: cert_base64 || '',
+      cert_base64: !!cert_base64
     };
 
     let responseData = null;
@@ -50,7 +53,7 @@ export default async function handler(req, res) {
       const body = {
         calendario: { expiracao: 3600 },
         valor: { original: formattedAmount },
-        chave: 'sandbox-pix-key@efi.com.br', // Sandbox test key
+        chave: pixKey,
         solicitacaoPagador: description || 'Recarga de moedas'
       };
 
