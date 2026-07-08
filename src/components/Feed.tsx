@@ -10,9 +10,19 @@ interface FeedProps {
   onPublish: (question: string, source: string, category: string) => void;
   userBalance: number;
   createPredictionRef: React.RefObject<CreatePredictionRef | null>;
+  currentUserId?: string;
+  onResolve?: (predictionId: string, winningChoice: boolean) => void;
 }
 
-export default function Feed({ predictions, onPlaceBet, onPublish, userBalance, createPredictionRef }: FeedProps) {
+export default function Feed({ 
+  predictions, 
+  onPlaceBet, 
+  onPublish, 
+  userBalance, 
+  createPredictionRef,
+  currentUserId,
+  onResolve
+}: FeedProps) {
   const [filter, setFilter] = useState<'hot' | 'new'>('hot');
 
   const sortedPredictions = [...predictions].sort((a, b) => {
@@ -21,42 +31,35 @@ export default function Feed({ predictions, onPlaceBet, onPublish, userBalance, 
       const bTotal = b.poolYes + b.poolNo;
       return bTotal - aTotal;
     } else {
-      return parseInt(b.id, 10) - parseInt(a.id, 10);
+      // Handle alphanumeric or UUID sorting
+      return b.id.localeCompare(a.id);
     }
   });
 
   return (
     <div className="flex-1 min-h-screen border-r border-zinc-800 bg-black min-w-0">
       {/* Feed Header - X Style Tabs */}
-      <div className="sticky top-0 z-30 bg-black/85 backdrop-blur-md border-b border-zinc-800">
-        <div className="px-4 pt-3 pb-1">
-          <h2 className="text-lg font-bold text-white tracking-tight text-left">Página Inicial</h2>
-        </div>
-        <div className="flex border-t border-zinc-900">
-          {/* Hot Tab */}
+      <div className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-800">
+        <div className="flex">
           <button
             onClick={() => setFilter('hot')}
-            className="flex-1 text-center py-3.5 hover:bg-zinc-900/60 transition-colors relative cursor-pointer"
+            className="flex-1 py-3.5 text-xs font-black tracking-wide border-b-2 transition-all cursor-pointer text-center"
+            style={{
+              borderColor: filter === 'hot' ? '#ffffff' : 'transparent',
+              color: filter === 'hot' ? '#ffffff' : '#71717a',
+            }}
           >
-            <span className={`text-xs uppercase tracking-wider ${filter === 'hot' ? 'font-black text-white' : 'font-semibold text-zinc-500'}`}>
-              Em Destaque
-            </span>
-            {filter === 'hot' && (
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-sky-500 rounded-full"></div>
-            )}
+            Quentes
           </button>
-          
-          {/* New Tab */}
           <button
             onClick={() => setFilter('new')}
-            className="flex-1 text-center py-3.5 hover:bg-zinc-900/60 transition-colors relative cursor-pointer"
+            className="flex-1 py-3.5 text-xs font-black tracking-wide border-b-2 transition-all cursor-pointer text-center"
+            style={{
+              borderColor: filter === 'new' ? '#ffffff' : 'transparent',
+              color: filter === 'new' ? '#ffffff' : '#71717a',
+            }}
           >
-            <span className={`text-xs uppercase tracking-wider ${filter === 'new' ? 'font-black text-white' : 'font-semibold text-zinc-500'}`}>
-              Novas
-            </span>
-            {filter === 'new' && (
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-sky-500 rounded-full"></div>
-            )}
+            Novas
           </button>
         </div>
       </div>
@@ -78,6 +81,8 @@ export default function Feed({ predictions, onPlaceBet, onPublish, userBalance, 
                 prediction={pred}
                 onPlaceBet={onPlaceBet}
                 userBalance={userBalance}
+                currentUserId={currentUserId}
+                onResolve={onResolve}
               />
             ))
           )}

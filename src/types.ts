@@ -1,5 +1,6 @@
 export interface Prediction {
   id: string;
+  authorId: string;
   username: string;
   userHandle: string;
   userAvatar: string;
@@ -10,6 +11,8 @@ export interface Prediction {
   poolYes: number;
   poolNo: number;
   betsCount: number;
+  status: 'active' | 'frozen' | 'resolved';
+  winningChoice?: boolean;
 }
 
 export interface UserBet {

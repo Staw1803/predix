@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
 import type { Prediction } from '../types';
-import { Award, AlertCircle, TrendingUp } from 'lucide-react';
+import { Award, AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
 
 interface PostCardProps {
   prediction: Prediction;
   onPlaceBet: (predictionId: string, choice: 'YES' | 'NO', amount: number) => boolean;
   userBalance: number;
+  currentUserId?: string;
+  onResolve?: (predictionId: string, winningChoice: boolean) => void;
 }
 
-export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCardProps) {
+export default function PostCard({ 
+  prediction, 
+  onPlaceBet, 
+  userBalance, 
+  currentUserId, 
+  onResolve 
+}: PostCardProps) {
   const [selectedChoice, setSelectedChoice] = useState<'YES' | 'NO' | null>(null);
   const [betAmount, setBetAmount] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -16,8 +24,10 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
   const totalPool = prediction.poolYes + prediction.poolNo;
   const yesPercent = totalPool > 0 ? Math.round((prediction.poolYes / totalPool) * 100) : 50;
   const noPercent = totalPool > 0 ? 100 - yesPercent : 50;
+  const isResolved = prediction.status === 'resolved';
 
   const handleChoiceSelect = (choice: 'YES' | 'NO') => {
+    if (isResolved) return; // Prevent betting on resolved posts
     if (selectedChoice === choice) {
       setSelectedChoice(null);
       setBetAmount('');
@@ -75,16 +85,23 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
           <div className="flex flex-col text-left">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-bold text-white text-sm hover:underline cursor-pointer">{prediction.username}</span>
-              <span className="text-zinc-500 text-xs font-mono">{prediction.userHandle}</span>
+              <span className="text-zinc-555 text-xs font-mono">{prediction.userHandle}</span>
             </div>
             <span className="text-zinc-550 text-xs">{prediction.timeAgo}</span>
           </div>
         </div>
         
         {/* Category Pill - Minimalist border */}
-        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase border border-zinc-800 text-zinc-500 bg-transparent">
-          {prediction.category}
-        </span>
+        <div className="flex items-center gap-2">
+          {isResolved && (
+            <span className="px-2 py-0.5 rounded-full text-[8px] font-black tracking-wider uppercase bg-sky-950/20 border border-sky-500/20 text-sky-400">
+              Resolvido
+            </span>
+          )}
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase border border-zinc-800 text-zinc-500 bg-transparent">
+            {prediction.category}
+          </span>
+        </div>
       </div>
 
       {/* Body Question */}
@@ -104,10 +121,13 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
         {/* YES Button */}
         <button
           onClick={() => handleChoiceSelect('YES')}
+          disabled={isResolved}
           className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-left transition-all duration-150 cursor-pointer ${
-            selectedChoice === 'YES'
-              ? 'border-sky-500 bg-sky-950/15'
-              : 'border-zinc-800 bg-black hover:bg-zinc-900/40'
+            isResolved 
+              ? 'border-zinc-900 bg-zinc-950/20 opacity-60 cursor-not-allowed'
+              : selectedChoice === 'YES'
+                ? 'border-sky-500 bg-sky-950/15'
+                : 'border-zinc-800 bg-black hover:bg-zinc-900/40'
           }`}
         >
           <span className={`text-xs font-extrabold ${selectedChoice === 'YES' ? 'text-sky-500' : 'text-zinc-300'}`}>SIM</span>
@@ -119,10 +139,13 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
         {/* NO Button */}
         <button
           onClick={() => handleChoiceSelect('NO')}
+          disabled={isResolved}
           className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-left transition-all duration-150 cursor-pointer ${
-            selectedChoice === 'NO'
-              ? 'border-sky-500 bg-sky-950/15'
-              : 'border-zinc-800 bg-black hover:bg-zinc-900/40'
+            isResolved 
+              ? 'border-zinc-900 bg-zinc-950/20 opacity-60 cursor-not-allowed'
+              : selectedChoice === 'NO'
+                ? 'border-sky-500 bg-sky-950/15'
+                : 'border-zinc-800 bg-black hover:bg-zinc-900/40'
           }`}
         >
           <span className={`text-xs font-extrabold ${selectedChoice === 'NO' ? 'text-sky-500' : 'text-zinc-300'}`}>NÃO</span>
@@ -132,8 +155,21 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
         </button>
       </div>
 
+      {/* Resolved Outcomes Badge */}
+      {isResolved && (
+        <div className="mb-4 pl-0 md:pl-12">
+          <div className="p-3.5 rounded-xl border border-zinc-800 bg-zinc-950/40 flex items-center justify-between text-xs">
+            <span className="font-extrabold text-zinc-450 flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-sky-400 shrink-0" />
+              <span>Mercado Encerrado</span>
+            </span>
+            <span className="font-black text-sky-400">Vencedor: {prediction.winningChoice ? 'SIM' : 'NÃO'}</span>
+          </div>
+        </div>
+      )}
+
       {/* Expandable Bet Wager Form - Pure flat black */}
-      {selectedChoice && (
+      {selectedChoice && !isResolved && (
         <form onSubmit={handleConfirmBet} className="mb-4 ml-0 md:ml-12 p-4 rounded-xl bg-black border border-zinc-800 flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
@@ -161,7 +197,7 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
               />
             </div>
 
-            {/* White Pill Button */}
+            {/* Confirm Wager Button */}
             <button
               type="submit"
               disabled={!!errorMsg || !betAmount}
@@ -180,7 +216,7 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
         </form>
       )}
 
-      {/* Progress Bar & Statistics - Monochrome zinc-300 vs zinc-700 */}
+      {/* Progress Bar & Statistics - Grayscale bars */}
       <div className="pl-0 md:pl-12 flex flex-col gap-2">
         <div className="flex items-center justify-between text-[10px] font-bold tracking-wide">
           <div className="flex items-center gap-1 text-zinc-200">
@@ -195,7 +231,7 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
           </div>
         </div>
 
-        {/* Visual Progress Slider - Clean flat grayscale */}
+        {/* Visual Progress Slider - Grayscale */}
         <div className="bg-zinc-800 h-1.5 rounded-full overflow-hidden flex">
           <div
             style={{ width: `${yesPercent}%` }}
@@ -216,6 +252,25 @@ export default function PostCard({ prediction, onPlaceBet, userBalance }: PostCa
             {prediction.betsCount} {prediction.betsCount === 1 ? 'aposta' : 'apostas'}
           </div>
         </div>
+
+        {/* Creator resolution actions */}
+        {!isResolved && currentUserId && currentUserId === prediction.authorId && (
+          <div className="mt-3.5 pt-3.5 border-t border-zinc-900 flex items-center gap-2">
+            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mr-1">Soberania do Criador:</span>
+            <button
+              onClick={() => onResolve?.(prediction.id, true)}
+              className="px-3 py-1 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white text-[10px] font-extrabold transition-all cursor-pointer"
+            >
+              Resolver SIM
+            </button>
+            <button
+              onClick={() => onResolve?.(prediction.id, false)}
+              className="px-3 py-1 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white text-[10px] font-extrabold transition-all cursor-pointer"
+            >
+              Resolver NÃO
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

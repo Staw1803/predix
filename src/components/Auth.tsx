@@ -7,7 +7,7 @@ import {
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { TrendingUp, Mail, Lock, ShieldAlert } from 'lucide-react';
+import { TrendingUp, Mail, Lock } from 'lucide-react';
 
 interface AuthProps {
   onLoginSimulated: () => void;
@@ -47,6 +47,13 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
           username: usernameVal,
           display_name: usernameVal,
           balance: 1000,
+          total_deposited: 0,
+          total_wagered: 0,
+          win_rate: 0,
+          total_bets: 0,
+          total_earnings: 0,
+          wins_count: 0,
+          bio: 'Palpitador no Predix.',
           updated_at: new Date()
         });
 
@@ -93,6 +100,13 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
           username: usernameVal,
           display_name: user.displayName || usernameVal,
           balance: 1000,
+          total_deposited: 0,
+          total_wagered: 0,
+          win_rate: 0,
+          total_bets: 0,
+          total_earnings: 0,
+          wins_count: 0,
+          bio: 'Palpitador no Predix.',
           updated_at: new Date()
         });
       }
@@ -217,24 +231,7 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
           </div>
         </div>
 
-        {/* Sandbox Bypass Widget */}
-        {!isFirebaseConfigured && (
-          <div className="flex flex-col gap-3 p-4 rounded-2xl bg-zinc-950/60 border border-zinc-850 text-left">
-            <div className="flex items-center gap-2 text-zinc-300 font-bold text-xs uppercase tracking-wide">
-              <ShieldAlert className="w-4 h-4 text-amber-500" />
-              <span>Modo Sandbox Ativo</span>
-            </div>
-            <p className="text-[11px] text-zinc-550 leading-normal">
-              A chave do Firebase não foi configurada localmente. O aplicativo está rodando em modo simulação. Clique abaixo para entrar instantaneamente com dados locais simulados.
-            </p>
-            <button
-              onClick={onLoginSimulated}
-              className="px-4 py-2 text-xs font-bold text-black bg-amber-400 hover:bg-amber-300 rounded-full cursor-pointer text-center"
-            >
-              Simular Entrar (Ignorar Configuração)
-            </button>
-          </div>
-        )}
+
       </div>
     </div>
   );

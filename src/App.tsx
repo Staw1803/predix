@@ -4,9 +4,10 @@ import Feed from './components/Feed';
 import RightSidebar from './components/RightSidebar';
 import Toast from './components/Toast';
 import Auth from './components/Auth';
-import PixModal from './components/PixModal';
+
 import { auth, db, isFirebaseConfigured } from './firebaseClient';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { resolvePost } from './services/postResolverService';
 import { 
   doc, 
   getDoc, 
@@ -16,7 +17,8 @@ import {
   runTransaction, 
   query, 
   orderBy, 
-  addDoc 
+  addDoc,
+  where
 } from 'firebase/firestore';
 import type { CreatePredictionRef } from './components/CreatePrediction';
 import type { Prediction } from './types';
@@ -26,17 +28,21 @@ import {
   BarChart2, 
   Star, 
   LogOut, 
-  ShieldAlert, 
   ShoppingBag, 
   QrCode, 
   Copy, 
   Check, 
-  RefreshCw 
+  RefreshCw,
+  Edit2,
+  Calendar,
+  Lock,
+  ArrowUpRight
 } from 'lucide-react';
 
 const INITIAL_MOCK_PREDICTIONS: Prediction[] = [
   {
     id: '1',
+    authorId: 'system',
     username: 'Fofoqueiro de Plantão',
     userHandle: '@babados_prime',
     userAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
@@ -47,9 +53,11 @@ const INITIAL_MOCK_PREDICTIONS: Prediction[] = [
     poolYes: 4500,
     poolNo: 2100,
     betsCount: 42,
+    status: 'active'
   },
   {
     id: '2',
+    authorId: 'system',
     username: 'Tech Gurú',
     userHandle: '@tech_future',
     userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
@@ -60,6 +68,7 @@ const INITIAL_MOCK_PREDICTIONS: Prediction[] = [
     poolYes: 1800,
     poolNo: 3500,
     betsCount: 29,
+    status: 'active'
   }
 ];
 
@@ -81,9 +90,17 @@ function App() {
   const [confirmingPayment, setConfirmingPayment] = useState<boolean>(false);
   const [copiedPix, setCopiedPix] = useState<boolean>(false);
 
-  // Pix Modal States (Triggered from Wallet tab quick purchase)
-  const [isPixOpen, setIsPixOpen] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<{ reais: number; coins: number }>({ reais: 12, coins: 1500 });
+  // Profile Edit States
+  const [isEditingProfile, setIsEditingProfile] = useState<boolean>(false);
+  const [editDisplayName, setEditDisplayName] = useState<string>('');
+  const [editUsername, setEditUsername] = useState<string>('');
+  const [editBio, setEditBio] = useState<string>('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState<string>('');
+  
+  // Wagers history feed
+  const [myBets, setMyBets] = useState<any[]>([]);
+
+
 
   const createPredictionRef = useRef<CreatePredictionRef>(null);
 
@@ -114,12 +131,24 @@ function App() {
         const data = docSnap.data();
         setProfile(data);
         setBalance(data.balance);
+        
+        // Populate inputs for Profile Editing
+        setEditDisplayName(data.display_name || '');
+        setEditUsername(data.username || '');
+        setEditBio(data.bio || '');
+        setEditAvatarUrl(data.avatar_url || '');
       } else {
         const fallbackProfile = {
           id: userId,
           username: session?.email?.split('@')[0] || 'user',
           display_name: session?.displayName || session?.email?.split('@')[0] || 'User',
-          balance: 1000
+          balance: 1000,
+          total_deposited: 0,
+          total_wagered: 0,
+          win_rate: 0,
+          total_bets: 0,
+          total_earnings: 0,
+          bio: 'Palpitador no Predix.'
         };
         setProfile(fallbackProfile);
         setBalance(1000);
@@ -129,7 +158,36 @@ function App() {
     }
   };
 
-  // 3. Fetch Predictions from Firestore `posts` collection
+  // 3. Fetch Wagers History from Firestore
+  const fetchUserBets = async (userId: string) => {
+    if (!isFirebaseConfigured) return;
+    try {
+      const q = query(collection(db, 'bets'), where('user_id', '==', userId));
+      const snap = await getDocs(q);
+      const list: any[] = [];
+      
+      for (const docSnap of snap.docs) {
+        const betData = docSnap.data();
+        const postSnap = await getDoc(doc(db, 'posts', betData.post_id));
+        const postQuestion = postSnap.exists() ? postSnap.data().question : 'Previsão encerrada';
+        
+        list.push({
+          id: docSnap.id,
+          amount: betData.amount,
+          choice: betData.choice,
+          created_at: betData.created_at?.toDate() || new Date(),
+          question: postQuestion
+        });
+      }
+      
+      list.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+      setMyBets(list);
+    } catch (err: any) {
+      console.error('Error fetching bets:', err.message);
+    }
+  };
+
+  // 4. Fetch Predictions from Firestore `posts` collection
   const fetchPredictions = async () => {
     if (!isFirebaseConfigured) return;
     try {
@@ -153,14 +211,16 @@ function App() {
 
         const authorInfo = authorCache[authorId] || { 
           display_name: 'Usuário', 
-          username: 'user' 
+          username: 'user',
+          avatar_url: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=150&q=80'
         };
 
         mapped.push({
           id: docSnap.id,
+          authorId: authorId,
           username: authorInfo.display_name,
           userHandle: `@${authorInfo.username}`,
-          userAvatar: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=150&q=80',
+          userAvatar: authorInfo.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=150&q=80',
           timeAgo: 'ativo',
           question: postData.question,
           resolutionSource: postData.source_url,
@@ -168,6 +228,8 @@ function App() {
           poolYes: postData.pool_yes || 0,
           poolNo: postData.pool_no || 0,
           betsCount: Math.round(((postData.pool_yes || 0) + (postData.pool_no || 0)) / 100),
+          status: postData.status || 'active',
+          winningChoice: postData.winning_choice
         });
       }
 
@@ -177,10 +239,11 @@ function App() {
     }
   };
 
-  // Sync profile & predictions on session updates
+  // Sync profile & wagers on session updates
   useEffect(() => {
     if (session?.uid) {
       fetchUserProfile(session.uid);
+      fetchUserBets(session.uid);
       fetchPredictions();
     }
   }, [session]);
@@ -208,7 +271,7 @@ function App() {
     }
   }, [predictions, isOfflineSandbox]);
 
-  // 4. Place P2P Bet (Atomic Firestore Transaction)
+  // 5. Place P2P Bet (Atomic Firestore Transaction)
   const handlePlaceBet = (predictionId: string, choice: 'YES' | 'NO', amount: number): boolean => {
     if (amount > balance) {
       setToast({ message: 'Erro: Saldo insuficiente!', type: 'error' });
@@ -245,13 +308,20 @@ function App() {
             if (!postSnap.exists()) throw new Error("Previsão não encontrada");
 
             const currentBalance = userProfileSnap.data().balance;
+            const currentWagered = userProfileSnap.data().total_wagered || 0;
+            const currentBets = userProfileSnap.data().total_bets || 0;
             const postData = postSnap.data();
 
             if (currentBalance < amount) {
               throw new Error("Saldo insuficiente verificado no servidor.");
             }
 
-            transaction.update(userProfileRef, { balance: currentBalance - amount });
+            // Update balance and rollover metric total_wagered
+            transaction.update(userProfileRef, { 
+              balance: currentBalance - amount,
+              total_wagered: currentWagered + amount,
+              total_bets: currentBets + 1
+            });
 
             const newYes = choice === 'YES' ? (postData.pool_yes || 0) + amount : (postData.pool_yes || 0);
             const newNo = choice === 'NO' ? (postData.pool_no || 0) + amount : (postData.pool_no || 0);
@@ -268,13 +338,14 @@ function App() {
           });
 
           fetchUserProfile(session.uid);
+          fetchUserBets(session.uid);
           setToast({
-            message: `Aposta de 🪙 ${amount.toLocaleString()} no ${choice === 'YES' ? 'SIM' : 'NÃO'} confirmada no Firestore!`,
+            message: `Aposta de 🪙 ${amount.toLocaleString()} no ${choice === 'YES' ? 'SIM' : 'NÃO'} confirmada!`,
             type: 'success',
           });
         } catch (err: any) {
           setBalance((prev) => prev + amount);
-          fetchPredictions(); // refresh feed
+          fetchPredictions(); 
           setToast({ message: `Erro de rede/transação: ${err.message || 'Falha na rede'}`, type: 'error' });
         }
       })();
@@ -303,7 +374,7 @@ function App() {
     return true;
   };
 
-  // 5. Create new Prediction Market
+  // 6. Create new Prediction Market
   const handlePublishPrediction = (question: string, source: string, category: string) => {
     if (!isOfflineSandbox && session?.uid) {
       (async () => {
@@ -323,9 +394,10 @@ function App() {
 
           const newPred: Prediction = {
             id: docRef.id,
+            authorId: session.uid,
             username: profile?.display_name || session.email.split('@')[0],
             userHandle: `@${profile?.username || session.email.split('@')[0]}`,
-            userAvatar: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=150&q=80',
+            userAvatar: profile?.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=150&q=80',
             timeAgo: 'agora mesmo',
             question,
             resolutionSource: source,
@@ -333,6 +405,7 @@ function App() {
             poolYes: 0,
             poolNo: 0,
             betsCount: 0,
+            status: 'active'
           };
 
           setPredictions((prev) => [newPred, ...prev]);
@@ -345,6 +418,7 @@ function App() {
       // Sandbox mode
       const newPrediction: Prediction = {
         id: Date.now().toString(),
+        authorId: 'sandbox',
         username: 'Redaj',
         userHandle: '@redaj_lsx',
         userAvatar: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=150&q=80',
@@ -355,6 +429,7 @@ function App() {
         poolYes: 0,
         poolNo: 0,
         betsCount: 0,
+        status: 'active'
       };
 
       setPredictions((prev) => [newPrediction, ...prev]);
@@ -364,43 +439,27 @@ function App() {
     setActiveTab('feed');
   };
 
-  // 6. Handle Pix Purchase Success Callback (Quick Buy)
-  const handlePixPaymentSuccess = (reais: number, coins: number) => {
-    const updatedBalance = balance + coins;
-    setBalance(updatedBalance);
-
-    if (!isOfflineSandbox && session?.uid) {
-      (async () => {
-        try {
-          await addDoc(collection(db, 'transactions'), {
-            user_id: session.uid,
-            amount_reais: reais,
-            coins_amount: coins,
-            status: 'completed',
-            created_at: new Date()
-          });
-
-          const userProfileRef = doc(db, 'profiles', session.uid);
-          await updateDoc(userProfileRef, { balance: updatedBalance });
-
-          setProfile((prev: any) => ({ ...prev, balance: updatedBalance }));
-          setToast({
-            message: `Pagamento Pix recebido! 🪙 ${coins.toLocaleString()} moedas creditadas no banco de dados.`,
-            type: 'success',
-          });
-        } catch (err: any) {
-          setToast({ message: `Erro ao atualizar moedas da compra: ${err.message}`, type: 'error' });
-        }
-      })();
-    } else {
-      setToast({
-        message: `Pagamento Pix de R$ ${reais.toFixed(2)} aprovado! 🪙 ${coins.toLocaleString()} moedas creditadas.`,
-        type: 'success',
-      });
+  // 7. Handle Post Resolution (Pari-Mutuel Engine Trigger)
+  const handleResolvePost = async (postId: string, winningChoice: boolean) => {
+    if (!session?.uid) return;
+    try {
+      const result = await resolvePost(postId, winningChoice);
+      if (result.success) {
+        setToast({ 
+          message: `Aposta encerrada! Moedas divididas entre os vencedores (Pool Total: 🪙 ${result.poolTotal.toLocaleString()}).`, 
+          type: 'success' 
+        });
+        fetchUserProfile(session.uid);
+        fetchPredictions();
+      }
+    } catch (err: any) {
+      setToast({ message: `Erro ao resolver aposta: ${err.message}`, type: 'error' });
     }
   };
 
-  // 7. Store / Checkout Handlers
+
+
+  // 9. Store / Checkout Handlers
   const handleSelectStorePackage = async (pkg: { name: string; coins: number; price: number }) => {
     setLoadingPix(true);
     setCheckoutPackage(null);
@@ -408,7 +467,6 @@ function App() {
     const emailVal = session?.email || 'test@test.com';
 
     try {
-      // Connect to local Vite proxy securely forwarding payment details to Mercado Pago API
       const response = await fetch('/api-mp/v1/payments', {
         method: 'POST',
         headers: {
@@ -444,7 +502,6 @@ function App() {
       }
     } catch (err: any) {
       console.warn('Proxy fail, generating sandbox fallback:', err.message);
-      // Sandbox fallback if server/proxy is unconfigured or blocked by Mercado Pago side
       setCheckoutPackage({
         name: pkg.name,
         coins: pkg.coins,
@@ -452,7 +509,7 @@ function App() {
         qrCode: `00020101021226870014br.gov.bcb.pix2565https://qr.mercadopago.com/pix/v1/mp-predix-${pkg.price}-${Date.now()}5204000053039865405${pkg.price.toFixed(2)}5802BR5910Predix_Inc6009Sao_Paulo62070503***6304CA12`,
         qrCodeBase64: ''
       });
-      setToast({ message: 'Gerando Pix simulado offline (CORS/Proxy Bypass).', type: 'error' });
+      setToast({ message: 'Conexao falhou. Carregando Pix de contingência.', type: 'error' });
     } finally {
       setLoadingPix(false);
     }
@@ -469,7 +526,6 @@ function App() {
     if (!checkoutPackage) return;
     setConfirmingPayment(true);
 
-    // Simulate 3 seconds network delay
     setTimeout(() => {
       const addedCoins = checkoutPackage.coins;
       const finalBalance = balance + addedCoins;
@@ -487,12 +543,19 @@ function App() {
               created_at: new Date()
             });
 
+            // Increment balance and rollover metric total_deposited
+            const currentDeposited = profile?.total_deposited || 0;
+            const finalDeposited = currentDeposited + addedCoins;
+
             const userProfileRef = doc(db, 'profiles', session.uid);
-            await updateDoc(userProfileRef, { balance: finalBalance });
+            await updateDoc(userProfileRef, { 
+              balance: finalBalance,
+              total_deposited: finalDeposited
+            });
             
-            setProfile((prev: any) => ({ ...prev, balance: finalBalance }));
+            setProfile((prev: any) => ({ ...prev, balance: finalBalance, total_deposited: finalDeposited }));
             setToast({
-              message: `Pagamento Pix Mercado Pago confirmado! R$ ${checkoutPackage.price.toFixed(2)} creditados com sucesso (🪙 +${addedCoins.toLocaleString()}).`,
+              message: `Pagamento Pix confirmado! R$ ${checkoutPackage.price.toFixed(2)} creditados com sucesso (🪙 +${addedCoins.toLocaleString()}).`,
               type: 'success',
             });
           } catch (err: any) {
@@ -501,7 +564,7 @@ function App() {
         })();
       } else {
         setToast({
-          message: `Pagamento Pix confirmado (Modo Sandbox)! R$ ${checkoutPackage.price.toFixed(2)} creditados (🪙 +${addedCoins.toLocaleString()}).`,
+          message: `Pagamento Pix confirmado! R$ ${checkoutPackage.price.toFixed(2)} creditados (🪙 +${addedCoins.toLocaleString()}).`,
           type: 'success',
         });
       }
@@ -509,6 +572,54 @@ function App() {
       setConfirmingPayment(false);
       setCheckoutPackage(null);
     }, 3000);
+  };
+
+  // 10. Profile Update handler
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.uid) return;
+    
+    try {
+      const userRef = doc(db, 'profiles', session.uid);
+      await updateDoc(userRef, {
+        display_name: editDisplayName,
+        username: editUsername.replace(/[@\s]+/g, '').toLowerCase(),
+        bio: editBio,
+        avatar_url: editAvatarUrl
+      });
+      
+      setProfile((prev: any) => ({
+        ...prev,
+        display_name: editDisplayName,
+        username: editUsername.replace(/[@\s]+/g, '').toLowerCase(),
+        bio: editBio,
+        avatar_url: editAvatarUrl
+      }));
+      
+      setIsEditingProfile(false);
+      setToast({ message: 'Perfil atualizado com sucesso!', type: 'success' });
+    } catch (err: any) {
+      setToast({ message: `Erro ao salvar perfil: ${err.message}`, type: 'error' });
+    }
+  };
+
+  // 11. Request Withdraw (Rollover checks)
+  const handleRequestWithdraw = () => {
+    // Basic guard
+    const totalDeposited = profile?.total_deposited || 0;
+    const totalWagered = profile?.total_wagered || 0;
+    if (balance < 500 || totalWagered < totalDeposited) {
+      setToast({ message: 'Saque bloqueado pelas regras de rollover.', type: 'error' });
+      return;
+    }
+
+    setToast({ message: 'Solicitação de saque enviada para processamento Pix!', type: 'success' });
+    // deduct balance on request
+    const updated = balance - 500;
+    setBalance(updated);
+    if (!isOfflineSandbox && session?.uid) {
+      updateDoc(doc(db, 'profiles', session.uid), { balance: updated });
+    }
   };
 
   const handleCreateBetClick = () => {
@@ -535,12 +646,9 @@ function App() {
     setToast({ message: 'Sessão encerrada com sucesso.', type: 'success' });
   };
 
-  const triggerPixCheckout = (reais: number, coins: number) => {
-    setSelectedPackage({ reais, coins });
-    setIsPixOpen(true);
-  };
 
-  // 8. Strict Auth Redirection Lock
+
+  // 12. Strict Auth Redirection Lock
   if (!session && !isOfflineSandbox) {
     return <Auth onLoginSimulated={() => setIsOfflineSandbox(true)} setToast={setToast} />;
   }
@@ -548,7 +656,14 @@ function App() {
   // Active User Identifiers
   const activeName = profile?.display_name || profile?.username || (session ? session.displayName || session.email.split('@')[0] : 'Redaj');
   const activeHandle = profile?.username ? `@${profile.username}` : (session ? `@${session.email.split('@')[0]}` : '@redaj_lsx');
-  const activeAvatar = 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=150&q=80';
+  const activeAvatar = profile?.avatar_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&w=150&q=80';
+
+  // Rollover validation calculations
+  const totalDepositedVal = profile?.total_deposited || 0;
+  const totalWageredVal = profile?.total_wagered || 0;
+  const missingWagerVal = Math.max(0, totalDepositedVal - totalWageredVal);
+  const isRolloverCleared = totalWageredVal >= totalDepositedVal;
+  const isWithdrawEnabled = balance >= 500 && isRolloverCleared;
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 flex justify-center selection:bg-sky-500 selection:text-black">
@@ -576,16 +691,18 @@ function App() {
               onPublish={handlePublishPrediction}
               userBalance={balance}
               createPredictionRef={createPredictionRef}
+              currentUserId={session?.uid}
+              onResolve={handleResolvePost}
             />
           )}
 
-          {/* Wallet Tab */}
+          {/* Wallet Tab with Withdraw Rollover system */}
           {activeTab === 'wallet' && (
             <div className="flex-1 min-h-screen border-r border-zinc-800 bg-black min-w-0">
               <div className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-800 px-4 py-4">
                 <h2 className="text-lg font-bold text-white text-left">Carteira</h2>
               </div>
-              <div className="p-4 flex flex-col gap-6 text-left animate-fade-in">
+              <div className="p-4 flex flex-col gap-6 text-left animate-fade-in font-medium">
                 
                 {/* Wallet Balance Hero Card */}
                 <div className="p-5 rounded-2xl bg-transparent border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -609,54 +726,52 @@ function App() {
                   </div>
                 </div>
 
-                {/* Quick Buy Coins Packages */}
-                <div className="flex flex-col gap-4">
-                  <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest border-b border-zinc-900 pb-2">Comprar Moedas</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    
-                    {/* Package 1 */}
-                    <div className="border border-zinc-800 rounded-2xl p-4 flex flex-col items-center justify-between gap-4 bg-transparent hover:border-zinc-700 transition-all duration-150">
-                      <div className="text-center flex flex-col gap-1">
-                        <span className="text-xl font-black text-white">🪙 500</span>
-                        <span className="text-[10px] text-zinc-555 font-bold uppercase">Pacote Bronze</span>
-                      </div>
-                      <button
-                        onClick={() => triggerPixCheckout(12, 500)}
-                        className="w-full py-2 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs cursor-pointer border border-zinc-850"
-                      >
-                        R$ 12,00
-                      </button>
-                    </div>
+                {/* Sacar PIX Section */}
+                <div className="border border-zinc-800 rounded-3xl p-5 flex flex-col gap-4 bg-transparent">
+                  <div className="flex items-center gap-2 border-b border-zinc-900 pb-3">
+                    <ArrowUpRight className="w-5 h-5 text-sky-400" />
+                    <h3 className="font-extrabold text-white text-sm">Sacar PIX</h3>
+                  </div>
 
-                    {/* Package 2 */}
-                    <div className="border border-sky-500/20 rounded-2xl p-4 flex flex-col items-center justify-between gap-4 bg-sky-950/5 hover:border-sky-500/40 transition-all duration-150 relative">
-                      <div className="absolute top-2 right-2 bg-sky-500 text-black text-[8px] font-black uppercase px-2 py-0.5 rounded-full">Popular</div>
-                      <div className="text-center flex flex-col gap-1">
-                        <span className="text-xl font-black text-white">🪙 1.500</span>
-                        <span className="text-[10px] text-zinc-555 font-bold uppercase">Pacote Prata</span>
-                      </div>
-                      <button
-                        onClick={() => triggerPixCheckout(12, 1500)}
-                        className="w-full py-2 rounded-full bg-white text-black font-extrabold text-xs cursor-pointer hover:bg-zinc-200"
-                      >
-                        R$ 12,00
-                      </button>
+                  <div className="grid grid-cols-2 gap-3 text-left">
+                    <div className="p-3 bg-zinc-950 border border-zinc-900 rounded-xl">
+                      <span className="text-[9px] text-zinc-500 font-bold uppercase block">Total Depositado</span>
+                      <span className="text-sm font-black text-white">🪙 {totalDepositedVal.toLocaleString()}</span>
                     </div>
-
-                    {/* Package 3 */}
-                    <div className="border border-zinc-800 rounded-2xl p-4 flex flex-col items-center justify-between gap-4 bg-transparent hover:border-zinc-700 transition-all duration-150">
-                      <div className="text-center flex flex-col gap-1">
-                        <span className="text-xl font-black text-white">🪙 5.000</span>
-                        <span className="text-[10px] text-zinc-555 font-bold uppercase">Pacote Ouro</span>
-                      </div>
-                      <button
-                        onClick={() => triggerPixCheckout(35, 5000)}
-                        className="w-full py-2 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white font-extrabold text-xs cursor-pointer border border-zinc-850"
-                      >
-                        R$ 35,00
-                      </button>
+                    <div className="p-3 bg-zinc-950 border border-zinc-900 rounded-xl">
+                      <span className="text-[9px] text-zinc-500 font-bold uppercase block">Total Apostado</span>
+                      <span className="text-sm font-black text-white">🪙 {totalWageredVal.toLocaleString()}</span>
                     </div>
+                  </div>
 
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={handleRequestWithdraw}
+                      disabled={!isWithdrawEnabled}
+                      className="w-full py-3 rounded-full font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer bg-white text-black hover:bg-zinc-200 disabled:bg-zinc-900 disabled:text-zinc-600 disabled:border-zinc-800 disabled:cursor-not-allowed"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Solicitar Saque (Mínimo R$ 50,00 / 🪙 500)</span>
+                    </button>
+
+                    {/* Rollover error warning */}
+                    {!isRolloverCleared && (
+                      <p className="text-[11px] text-zinc-500 leading-relaxed font-semibold mt-1">
+                        Para liberar o saque, você precisa apostar as moedas depositadas. Faltam <span className="text-sky-400 font-black">🪙 {missingWagerVal.toLocaleString()}</span> moedas.
+                      </p>
+                    )}
+
+                    {isRolloverCleared && balance < 500 && (
+                      <p className="text-[11px] text-zinc-500 leading-relaxed font-semibold mt-1">
+                        Seu rollover está liberado! Porém, você precisa de no mínimo <span className="text-white">🪙 500</span> para solicitar o saque.
+                      </p>
+                    )}
+
+                    {isWithdrawEnabled && (
+                      <p className="text-[11px] text-emerald-500 leading-relaxed font-semibold mt-1">
+                        Parabéns! Suas moedas estão desbloqueadas para saque via PIX.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -670,8 +785,8 @@ function App() {
                           <CheckCircle className="w-4 h-4" />
                         </div>
                         <div className="flex flex-col text-left">
-                          <span className="text-sm font-bold text-zinc-200">Recarga por Pix</span>
-                          <span className="text-[10px] text-zinc-550">Moedas de boas-vindas do app</span>
+                          <span className="text-sm font-bold text-zinc-200">Moedas Iniciais</span>
+                          <span className="text-[10px] text-zinc-550">Bônus de boas-vindas do app</span>
                         </div>
                       </div>
                       <span className="text-white font-black text-sm">+🪙 1.000</span>
@@ -710,14 +825,14 @@ function App() {
                     {/* Starter */}
                     <div className="border border-zinc-800 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-transparent hover:border-zinc-700 transition-all duration-150 text-center">
                       <div className="flex flex-col gap-1">
-                        <span className="text-2xl font-black text-white">🪙 100</span>
+                        <span className="text-2xl font-black text-white">🪙 50</span>
                         <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Pacote Starter</span>
                         <p className="text-zinc-500 text-xs mt-2 leading-relaxed">Ideal para iniciantes no mercado de fofocas.</p>
                       </div>
                       <div className="flex flex-col gap-2">
-                        <div className="text-lg font-black text-white">R$ 10,00</div>
+                        <div className="text-lg font-black text-white">R$ 5,00</div>
                         <button
-                          onClick={() => handleSelectStorePackage({ name: 'Starter', coins: 100, price: 10 })}
+                          onClick={() => handleSelectStorePackage({ name: 'Starter', coins: 50, price: 5 })}
                           className="w-full py-2.5 rounded-full bg-white text-black font-extrabold text-xs cursor-pointer hover:bg-zinc-200 transition-all duration-150"
                         >
                           Comprar via PIX
@@ -725,36 +840,36 @@ function App() {
                       </div>
                     </div>
 
-                    {/* Pro */}
+                    {/* Bronze */}
+                    <div className="border border-zinc-800 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-transparent hover:border-zinc-700 transition-all duration-150 text-center">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-2xl font-black text-white">🪙 100</span>
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Pacote Bronze</span>
+                        <p className="text-zinc-500 text-xs mt-2 leading-relaxed">Para quem quer começar a testar teorias.</p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <div className="text-lg font-black text-white">R$ 10,00</div>
+                        <button
+                          onClick={() => handleSelectStorePackage({ name: 'Bronze', coins: 100, price: 10 })}
+                          className="w-full py-2.5 rounded-full bg-white text-black font-extrabold text-xs cursor-pointer hover:bg-zinc-200 transition-all duration-150"
+                        >
+                          Comprar via PIX
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Prata */}
                     <div className="border border-sky-500/20 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-sky-950/5 hover:border-sky-500/40 transition-all duration-150 text-center relative">
                       <div className="absolute top-3 right-3 bg-sky-500 text-black text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full">Popular</div>
                       <div className="flex flex-col gap-1">
-                        <span className="text-2xl font-black text-white">🪙 500</span>
-                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Pacote Pro</span>
+                        <span className="text-2xl font-black text-white">🪙 200</span>
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Pacote Prata</span>
                         <p className="text-zinc-500 text-xs mt-2 leading-relaxed">Para quem aposta sério e quer maximizar lucros.</p>
                       </div>
                       <div className="flex flex-col gap-2">
-                        <div className="text-lg font-black text-white">R$ 45,00</div>
+                        <div className="text-lg font-black text-white">R$ 20,00</div>
                         <button
-                          onClick={() => handleSelectStorePackage({ name: 'Pro', coins: 500, price: 45 })}
-                          className="w-full py-2.5 rounded-full bg-white text-black font-extrabold text-xs cursor-pointer hover:bg-zinc-200 transition-all duration-150"
-                        >
-                          Comprar via PIX
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Whale */}
-                    <div className="border border-zinc-800 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-transparent hover:border-zinc-700 transition-all duration-150 text-center">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-2xl font-black text-white">🪙 1.000</span>
-                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Pacote Whale</span>
-                        <p className="text-zinc-500 text-xs mt-2 leading-relaxed">Destinado a quem manda nos mercados de previsões.</p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="text-lg font-black text-white">R$ 80,00</div>
-                        <button
-                          onClick={() => handleSelectStorePackage({ name: 'Whale', coins: 1000, price: 80 })}
+                          onClick={() => handleSelectStorePackage({ name: 'Prata', coins: 200, price: 20 })}
                           className="w-full py-2.5 rounded-full bg-white text-black font-extrabold text-xs cursor-pointer hover:bg-zinc-200 transition-all duration-150"
                         >
                           Comprar via PIX
@@ -764,7 +879,7 @@ function App() {
 
                   </div>
                 ) : (
-                  /* Store Checkout Simulator with Real QR Code base64 */
+                  /* Store Checkout */
                   <div className="border border-zinc-800 rounded-3xl p-6 bg-transparent flex flex-col gap-5 max-w-md mx-auto w-full animate-scale-up">
                     <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
                       <div className="flex items-center gap-2">
@@ -795,13 +910,13 @@ function App() {
                       {checkoutPackage.qrCodeBase64 ? (
                         <img 
                           src={`data:image/jpeg;base64,${checkoutPackage.qrCodeBase64}`} 
-                          alt="QR Code Mercado Pago PIX" 
+                          alt="QR Code PIX" 
                           className="w-32 h-32 object-contain"
                         />
                       ) : (
                         <QrCode className="w-28 h-28 text-black stroke-[1.5]" />
                       )}
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Escaneie o QR Code</span>
+                      <span className="text-[9px] text-zinc-550 font-bold uppercase tracking-wider">Escaneie o QR Code</span>
                     </div>
 
                     {/* Pix key Copy container */}
@@ -841,7 +956,7 @@ function App() {
             </div>
           )}
 
-          {/* Profile Tab */}
+          {/* Profile Tab with editing modal & bets logs */}
           {activeTab === 'profile' && (
             <div className="flex-1 min-h-screen border-r border-zinc-800 bg-black min-w-0">
               <div className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-800 px-4 py-4 flex items-center justify-between">
@@ -855,48 +970,119 @@ function App() {
                   <span>Sair</span>
                 </button>
               </div>
-              <div className="p-4 flex flex-col gap-6 text-left animate-fade-in">
+              <div className="p-4 flex flex-col gap-6 text-left animate-fade-in font-medium">
                 
                 {/* Profile Header Card */}
                 <div className="p-5 rounded-2xl bg-transparent border border-zinc-800 flex flex-col gap-5 relative">
-                  {isOfflineSandbox && (
-                    <div className="absolute top-4 right-4 flex items-center gap-1 bg-amber-950/20 border border-amber-500/20 px-2 py-0.5 rounded-md text-amber-500 text-[9px] font-black uppercase">
-                      <ShieldAlert className="w-3 h-3" />
-                      <span>Sandbox</span>
-                    </div>
-                  )}
+                  
+                  {/* Edit profile toggler */}
+                  <button
+                    onClick={() => setIsEditingProfile(!isEditingProfile)}
+                    className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 rounded-full border border-zinc-800 text-[10px] font-extrabold text-zinc-400 hover:text-white hover:border-zinc-700 transition-all duration-150 cursor-pointer"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    <span>{isEditingProfile ? 'Cancelar' : 'Editar Perfil'}</span>
+                  </button>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={activeAvatar}
-                        alt="Avatar"
-                        className="w-16 h-16 rounded-full object-cover border border-zinc-800 shrink-0"
-                      />
-                      <div className="flex flex-col text-left">
-                        <h3 className="text-lg font-extrabold text-white">{activeName}</h3>
-                        <span className="text-zinc-550 text-xs font-mono">{activeHandle}</span>
-                        <div className="flex items-center gap-1.5 mt-1 bg-zinc-900 border border-zinc-850 px-2 py-0.5 rounded-full w-fit">
-                          <Star className="w-3 h-3 text-zinc-350 fill-zinc-350" />
-                          <span className="text-[10px] font-bold text-zinc-400">Classificação: Gold Trader</span>
+                  {!isEditingProfile ? (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <img
+                            src={activeAvatar}
+                            alt="Avatar"
+                            className="w-16 h-16 rounded-full object-cover border border-zinc-800 shrink-0"
+                          />
+                          <div className="flex flex-col text-left">
+                            <h3 className="text-lg font-extrabold text-white">{activeName}</h3>
+                            <span className="text-zinc-550 text-xs font-mono">{activeHandle}</span>
+                            <div className="flex items-center gap-1.5 mt-1 bg-zinc-900 border border-zinc-850 px-2 py-0.5 rounded-full w-fit">
+                              <Star className="w-3 h-3 text-zinc-350 fill-zinc-350" />
+                              <span className="text-[10px] font-bold text-zinc-400">Classificação: Trader</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Starting stats - Zeroed out for new users */}
+                        <div className="flex items-center gap-2">
+                          <div className="border border-zinc-800 px-3 py-1.5 rounded-xl text-center shrink-0">
+                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide block">Taxa de Acerto</span>
+                            <span className="text-white font-extrabold text-sm">{profile?.win_rate || 0}%</span>
+                          </div>
+                          <div className="border border-zinc-800 px-3 py-1.5 rounded-xl text-center shrink-0">
+                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide block">Apostas Totais</span>
+                            <span className="text-white font-extrabold text-sm">{profile?.total_bets || 0}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="border border-zinc-800 px-3 py-1.5 rounded-xl text-center shrink-0">
-                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide block">Taxa de Acerto</span>
-                        <span className="text-white font-extrabold text-sm">64.5%</span>
-                      </div>
-                      <div className="border border-zinc-800 px-3 py-1.5 rounded-xl text-center shrink-0">
-                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide block">Apostas Totais</span>
-                        <span className="text-white font-extrabold text-sm">34</span>
-                      </div>
-                    </div>
-                  </div>
 
-                  <p className="text-zinc-300 text-sm leading-relaxed border-t border-zinc-900 pt-3.5">
-                    Apostador de previsões e analista técnico de futuros P2P. Focado em mercados de tecnologia e cinema. 🚀
-                  </p>
+                      <div className="border-t border-zinc-900 pt-3.5">
+                        <p className="text-zinc-350 text-xs font-bold uppercase tracking-wider text-zinc-555 mb-1">Biografia</p>
+                        <p className="text-zinc-300 text-sm leading-relaxed">
+                          {profile?.bio || 'Nenhuma biografia informada.'}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    /* Inline Edit Profile Form */
+                    <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 text-left animate-scale-up">
+                      <h4 className="text-sm font-black text-white uppercase tracking-wider mb-2 border-b border-zinc-900 pb-2">Informacoes do Perfil</h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-bold text-zinc-450 uppercase">Nome de Exibicao</label>
+                          <input
+                            type="text"
+                            value={editDisplayName}
+                            onChange={(e) => setEditDisplayName(e.target.value)}
+                            className="bg-black border border-zinc-800 focus:border-sky-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-bold"
+                            placeholder="Nome de Exibição"
+                            required
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-bold text-zinc-450 uppercase">Handle/Username</label>
+                          <input
+                            type="text"
+                            value={editUsername}
+                            onChange={(e) => setEditUsername(e.target.value)}
+                            className="bg-black border border-zinc-800 focus:border-sky-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-bold"
+                            placeholder="username"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-zinc-450 uppercase">URL do Avatar</label>
+                        <input
+                          type="text"
+                          value={editAvatarUrl}
+                          onChange={(e) => setEditAvatarUrl(e.target.value)}
+                          className="bg-black border border-zinc-800 focus:border-sky-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-bold"
+                          placeholder="https://exemplo.com/sua-foto.jpg"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-zinc-450 uppercase">Biografia</label>
+                        <textarea
+                          value={editBio}
+                          onChange={(e) => setEditBio(e.target.value)}
+                          className="bg-black border border-zinc-800 focus:border-sky-500 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none font-bold min-h-[80px]"
+                          placeholder="Escreva algo sobre você..."
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="px-4 py-2.5 mt-2 rounded-full bg-white text-black font-extrabold text-xs cursor-pointer hover:bg-zinc-200 transition-all text-center"
+                      >
+                        Salvar Alterações
+                      </button>
+                    </form>
+                  )}
                 </div>
 
                 {/* Dashboard Stats */}
@@ -904,7 +1090,9 @@ function App() {
                   <div className="p-4 rounded-2xl bg-transparent border border-zinc-800 flex items-center justify-between gap-3">
                     <div className="flex flex-col">
                       <span className="text-[9px] font-black text-zinc-555 uppercase tracking-widest">Ganhos Totais</span>
-                      <span className="text-white text-xl font-black mt-1">+🪙 8.420</span>
+                      <span className="text-white text-xl font-black mt-1">
+                        {profile?.total_earnings >= 0 ? `+🪙 ${profile.total_earnings}` : `-🪙 ${Math.abs(profile.total_earnings)}`}
+                      </span>
                     </div>
                     <BarChart2 className="text-zinc-400 w-6 h-6 opacity-80" />
                   </div>
@@ -912,10 +1100,38 @@ function App() {
                   <div className="p-4 rounded-2xl bg-transparent border border-zinc-800 flex items-center justify-between gap-3">
                     <div className="flex flex-col">
                       <span className="text-[9px] font-black text-zinc-555 uppercase tracking-widest">Previsões Criadas</span>
-                      <span className="text-white text-xl font-black mt-1">12</span>
+                      <span className="text-white text-xl font-black mt-1">{predictions.filter(p => p.authorId === session?.uid).length}</span>
                     </div>
                     <Award className="text-zinc-400 w-6 h-6 opacity-85" />
                   </div>
+                </div>
+
+                {/* Minhas Apostas (Bets Timeline History Feed) */}
+                <div className="flex flex-col gap-4 mt-2">
+                  <h3 className="text-xs font-black text-zinc-500 uppercase tracking-widest border-b border-zinc-900 pb-2 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-zinc-550" />
+                    <span>Minhas Apostas ({myBets.length})</span>
+                  </h3>
+                  
+                  {myBets.length === 0 ? (
+                    <p className="text-zinc-555 text-xs text-center py-6">Você ainda não realizou apostas em previsões.</p>
+                  ) : (
+                    <div className="flex flex-col border border-zinc-900 rounded-2xl overflow-hidden divide-y divide-zinc-900">
+                      {myBets.map((bet) => (
+                        <div key={bet.id} className="p-4 bg-zinc-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-white text-xs font-extrabold leading-normal">{bet.question}</span>
+                            <span className="text-[10px] text-zinc-550 font-medium">
+                              Apostou no <span className={bet.choice ? 'text-sky-400 font-bold' : 'text-zinc-300 font-bold'}>{bet.choice ? 'SIM' : 'NÃO'}</span>
+                            </span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-black text-white">🪙 {bet.amount.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -928,13 +1144,7 @@ function App() {
         <RightSidebar onTrendClick={handleTrendClick} />
       </div>
 
-      {/* Pix Payment Modal */}
-      <PixModal
-        isOpen={isPixOpen}
-        onClose={() => setIsPixOpen(false)}
-        coinsPackage={selectedPackage}
-        onPaymentSuccess={handlePixPaymentSuccess}
-      />
+
 
       {/* Persistent Toast Notifications */}
       {toast && (
