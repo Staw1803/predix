@@ -4,8 +4,7 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup, 
-  GoogleAuthProvider, 
-  FacebookAuthProvider 
+  GoogleAuthProvider 
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { TrendingUp, Mail, Lock, ShieldAlert } from 'lucide-react';
@@ -67,10 +66,10 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
     }
   };
 
-  const handleOAuthLogin = async (provider: 'google' | 'facebook') => {
+  const handleOAuthLogin = async () => {
     if (!isFirebaseConfigured) {
       setToast({
-        message: `Simulação: Login com ${provider === 'google' ? 'Google' : 'Facebook'} iniciado.`,
+        message: 'Simulação: Login com Google iniciado.',
         type: 'success',
       });
       onLoginSimulated();
@@ -79,10 +78,7 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
 
     setLoading(true);
     try {
-      const providerInstance = provider === 'google' 
-        ? new GoogleAuthProvider() 
-        : new FacebookAuthProvider();
-        
+      const providerInstance = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, providerInstance);
       const user = result.user;
 
@@ -101,7 +97,7 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
         });
       }
 
-      setToast({ message: `Login via ${provider === 'google' ? 'Google' : 'Facebook'} concluído!`, type: 'success' });
+      setToast({ message: 'Login via Google concluído!', type: 'success' });
     } catch (err: any) {
       setToast({ message: `Erro OAuth: ${err.message}`, type: 'error' });
     } finally {
@@ -134,7 +130,7 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
           <div className="flex flex-col gap-3">
             {/* Google */}
             <button
-              onClick={() => handleOAuthLogin('google')}
+              onClick={handleOAuthLogin}
               disabled={loading}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-full bg-white text-black font-extrabold text-sm hover:bg-zinc-200 disabled:opacity-40 transition-all duration-150 cursor-pointer"
             >
@@ -157,18 +153,6 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
                 />
               </svg>
               <span>Inscrever-se com o Google</span>
-            </button>
-
-            {/* Facebook */}
-            <button
-              onClick={() => handleOAuthLogin('facebook')}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-full bg-zinc-900 border border-zinc-800 text-white font-extrabold text-sm hover:bg-zinc-800 disabled:opacity-40 transition-all duration-150 cursor-pointer"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-              <span>Inscrever-se com o Facebook</span>
             </button>
           </div>
 
