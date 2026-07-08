@@ -10,10 +10,10 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     server: {
       proxy: {
-        '/api-mp': {
-          target: 'https://api.mercadopago.com',
+        '/api/payments': {
+          target: 'https://api.mercadopago.com/v1/payments',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api-mp/, ''),
+          rewrite: () => '',
           headers: {
             Authorization: `Bearer ${env.VITE_MP_ACCESS_TOKEN || 'APP_USR-c9cf66a7-a044-4859-a9ad-544598f52b76'}`
           }

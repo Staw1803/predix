@@ -480,11 +480,10 @@ function App() {
     const emailVal = session?.email || 'test@test.com';
 
     try {
-      const response = await fetch('https://corsproxy.io/?https://api.mercadopago.com/v1/payments', {
+      const response = await fetch('/api/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_MP_ACCESS_TOKEN}`,
           'X-Idempotency-Key': `predix-${Date.now()}`
         },
         body: JSON.stringify({
