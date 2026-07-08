@@ -40,25 +40,19 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // 2. Initialize Firestore profile document
-        const usernameVal = email.split('@')[0];
-        await setDoc(doc(db, 'profiles', user.uid), {
+        // 2. Initialize Firestore user document
+        const baseUsername = email.split('@')[0];
+        const usernameVal = baseUsername.startsWith('@') ? baseUsername : `@${baseUsername}`;
+        await setDoc(doc(db, 'users', user.uid), {
           id: user.uid,
           username: usernameVal,
-          display_name: usernameVal,
-          balance: 1000,
-          total_deposited: 0,
-          total_wagered: 0,
-          win_rate: 0,
-          total_bets: 0,
-          total_earnings: 0,
-          wins_count: 0,
-          bio: 'Palpitador no Predix.',
-          updated_at: new Date()
+          displayName: baseUsername,
+          photoURL: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80`,
+          credits: 0
         });
 
         setToast({
-          message: 'Cadastro realizado com sucesso e perfil inicializado com 🪙 1.000!',
+          message: 'Cadastro realizado com sucesso!',
           type: 'success',
         });
         setIsSignUp(false);
@@ -89,25 +83,19 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
       const result = await signInWithPopup(auth, providerInstance);
       const user = result.user;
 
-      // Check if profile document already exists in Firestore
-      const profileRef = doc(db, 'profiles', user.uid);
-      const profileSnap = await getDoc(profileRef);
+      // Check if user document already exists in Firestore
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
       
-      if (!profileSnap.exists()) {
-        const usernameVal = user.displayName?.toLowerCase().replace(/\s+/g, '') || user.email?.split('@')[0] || 'user';
-        await setDoc(profileRef, {
+      if (!userSnap.exists()) {
+        const rawUsername = user.displayName?.toLowerCase().replace(/\s+/g, '') || user.email?.split('@')[0] || 'user';
+        const usernameVal = rawUsername.startsWith('@') ? rawUsername : `@${rawUsername}`;
+        await setDoc(userRef, {
           id: user.uid,
           username: usernameVal,
-          display_name: user.displayName || usernameVal,
-          balance: 1000,
-          total_deposited: 0,
-          total_wagered: 0,
-          win_rate: 0,
-          total_bets: 0,
-          total_earnings: 0,
-          wins_count: 0,
-          bio: 'Palpitador no Predix.',
-          updated_at: new Date()
+          displayName: user.displayName || rawUsername,
+          photoURL: user.photoURL || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80`,
+          credits: 0
         });
       }
 

@@ -14,10 +14,27 @@ export interface Prediction {
   status: 'active' | 'frozen' | 'resolved';
   winningChoice?: boolean;
 }
-
-export interface UserBet {
-  predictionId: string;
-  choice: 'YES' | 'NO';
-  amount: number;
-  timestamp: Date;
+export interface User {
+  id: string;
+  displayName: string;
+  username: string;
+  photoURL: string;
+  credits: number;
 }
+
+export interface Post {
+  id: string;
+  authorId: string;
+  content: string;
+  timestamp: any; // Firestore Timestamp
+  likesCount: number;
+}
+
+export interface Comment {
+  id: string;
+  postId: string;
+  authorId: string;
+  content: string;
+  timestamp: any; // Firestore Timestamp
+}
+

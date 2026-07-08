@@ -1,21 +1,17 @@
-import { Home, PlusCircle, Wallet, User, TrendingUp, ShoppingBag } from 'lucide-react';
+import { Home, User, TrendingUp } from 'lucide-react';
 
 interface SidebarProps {
-  balance: number;
+  credits: number;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  onCreateBetClick: () => void;
   username: string;
   userHandle: string;
   userAvatar: string;
 }
 
-export default function Sidebar({ balance, activeTab, setActiveTab, onCreateBetClick, username, userHandle, userAvatar }: SidebarProps) {
+export default function Sidebar({ credits, activeTab, setActiveTab, username, userHandle, userAvatar }: SidebarProps) {
   const menuItems = [
     { id: 'feed', name: 'Início', icon: Home },
-    { id: 'create', name: 'Criar Aposta', icon: PlusCircle, action: onCreateBetClick },
-    { id: 'wallet', name: 'Carteira', icon: Wallet },
-    { id: 'store', name: 'Loja', icon: ShoppingBag },
     { id: 'profile', name: 'Perfil', icon: User },
   ];
 
@@ -32,12 +28,12 @@ export default function Sidebar({ balance, activeTab, setActiveTab, onCreateBetC
           </span>
         </div>
 
-        {/* Balance Badge - Simple flat pill */}
+        {/* Credits Badge - Simple flat pill */}
         <div className="border border-zinc-800 rounded-full px-4 py-2 flex items-center justify-between gap-2 hover:bg-zinc-900 transition-all duration-200 shrink-0">
-          <span className="text-zinc-550 font-bold text-xs hidden md:inline">Saldo</span>
+          <span className="text-zinc-550 font-bold text-xs hidden md:inline">Créditos</span>
           <span className="text-white font-extrabold text-sm flex items-center gap-1 mx-auto md:mx-0">
             <span>🪙</span>
-            <span>{balance.toLocaleString()}</span>
+            <span>{credits.toLocaleString()}</span>
           </span>
         </div>
 
@@ -51,11 +47,7 @@ export default function Sidebar({ balance, activeTab, setActiveTab, onCreateBetC
               <button
                 key={item.id}
                 onClick={() => {
-                  if (item.action) {
-                    item.action();
-                  } else {
-                    setActiveTab(item.id);
-                  }
+                  setActiveTab(item.id);
                 }}
                 className={`w-full flex items-center justify-center md:justify-start gap-4 px-4 py-3 rounded-full text-base transition-all duration-150 cursor-pointer ${
                   isActive 
@@ -79,8 +71,8 @@ export default function Sidebar({ balance, activeTab, setActiveTab, onCreateBetC
           className="w-9 h-9 rounded-full object-cover border border-zinc-800 shrink-0"
         />
         <div className="hidden md:flex flex-col text-left">
-          <span className="font-bold text-white text-sm">{username}</span>
-          <span className="text-zinc-550 text-xs font-mono">{userHandle}</span>
+          <span className="font-bold text-white text-sm truncate max-w-[100px]">{username}</span>
+          <span className="text-zinc-550 text-xs font-mono truncate max-w-[100px]">{userHandle}</span>
         </div>
       </div>
     </aside>
