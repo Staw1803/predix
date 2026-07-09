@@ -6,6 +6,7 @@ import Toast from './components/Toast';
 import Auth from './components/Auth';
 import WalletTab from './components/WalletTab';
 import ProfilePage from './components/ProfilePage';
+import PredictionsTab from './components/PredictionsTab';
 
 import { auth, db, isFirebaseConfigured } from './firebaseClient';
 import { MOEDA_VALOR_REAL } from './constants';
@@ -320,6 +321,22 @@ function App() {
               setToast={setToast}
               onUserClick={navigateToProfile}
             />
+          )}
+
+          {/* Predictions Tab */}
+          {activeTab === 'predictions' && (
+            <div className="flex-1 min-h-screen border-r border-zinc-800 bg-black min-w-0 flex flex-col">
+              <PredictionsTab
+                session={session}
+                profile={profile}
+                balance={balance}
+                setToast={setToast}
+                onBalanceUpdate={(newBal) => {
+                  setBalance(newBal);
+                  setProfile((prev: any) => ({ ...prev, credits: newBal }));
+                }}
+              />
+            </div>
           )}
 
           {/* Wallet Tab */}
