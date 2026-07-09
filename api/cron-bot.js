@@ -57,6 +57,8 @@ const AVATAR_IDS = [
   '1522075469751-3a6694fb2f61', '1580489944761-15a19d654956', '1633332755192-727a05c4013d'
 ];
 
+import { verifyFirebaseToken } from './_utils.js';
+
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -69,6 +71,16 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
+    return;
+  }
+
+  // 1. Secure Route: Verify User Authentication Token
+  try {
+    const authHeader = req.headers['authorization'];
+    const apiKey = process.env.VITE_FIREBASE_API_KEY;
+    await verifyFirebaseToken(authHeader, apiKey);
+  } catch (authError) {
+    res.status(401).json({ error: authError.message || "Unauthorized" });
     return;
   }
 

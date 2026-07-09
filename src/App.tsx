@@ -158,16 +158,24 @@ function App() {
 
   // Trigger serverless bot activity in background (handled by server rate-limits)
   useEffect(() => {
-    if (session) {
-      fetch('/api/cron-bot')
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === 'success') {
-            console.log("Bot automation completed successfully:", data.message);
+    const triggerBot = async () => {
+      if (!session) return;
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/cron-bot', {
+          headers: {
+            'Authorization': `Bearer ${idToken}`
           }
-        })
-        .catch(err => console.error("Error triggering bot:", err));
-    }
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          console.log("Bot automation completed successfully:", data.message);
+        }
+      } catch (err) {
+        console.error("Error triggering bot:", err);
+      }
+    };
+    triggerBot();
   }, [session]);
 
 
@@ -189,10 +197,12 @@ function App() {
     setCheckoutPackage(null);
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/payments', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
         },
         body: JSON.stringify({
           transaction_amount: pkg.price,
@@ -254,10 +264,15 @@ function App() {
       });
     }, 1000);
 
-    // B. Polling Interval (checks payment status in EfÃ­ every 5 seconds)
+    // B. Polling Interval (checks payment status in Efí every 5 seconds)
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/check-payment?txid=${checkoutPackage.txid}`);
+        const idToken = await auth.currentUser?.getIdToken();
+        const response = await fetch(`/api/check-payment?txid=${checkoutPackage.txid}`, {
+          headers: {
+            'Authorization': `Bearer ${idToken}`
+          }
+        });
         if (response.ok) {
           const data = await response.json();
           if (data.status === 'CONCLUIDA') {
