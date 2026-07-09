@@ -6,7 +6,7 @@ import {
   signInWithRedirect, 
   GoogleAuthProvider 
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { TrendingUp, Mail, Lock } from 'lucide-react';
 
 interface AuthProps {

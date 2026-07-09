@@ -18,8 +18,7 @@ export default function Sidebar({ credits, activeTab, setActiveTab, username, us
     { id: 'profile', name: 'Perfil', icon: User },
   ];
 
-  const isDev = typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || import.meta.env.DEV);
+
 
   return (
     <aside className="fixed md:sticky bottom-0 md:top-0 left-0 w-full md:h-screen md:w-64 border-t md:border-t-0 md:border-r border-zinc-800 bg-black flex md:flex-col justify-between md:justify-between px-2 py-2 md:p-4 z-40">
