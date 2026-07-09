@@ -39,7 +39,13 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
   const [activeSubTab, setActiveSubTab] = useState<'open' | 'resolved'>('open');
   
   // Admin Mode
-  const isAdmin = profile?.isAdmin === true || profile?.role === 'admin' || session?.email?.includes('admin') || session?.email?.includes('jader');
+  const isAdmin = profile?.isAdmin === true || 
+                  profile?.role === 'admin' || 
+                  session?.email?.includes('admin') || 
+                  session?.email?.includes('jader') || 
+                  session?.email?.includes('redaj') ||
+                  profile?.username === '@redaj' ||
+                  profile?.username === '@jader';
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newQuestion, setNewQuestion] = useState('');
   const [newSource, setNewSource] = useState('');
