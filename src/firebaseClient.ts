@@ -42,4 +42,7 @@ const app = getApps().length === 0
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+// Set max upload retry timeouts to 5 seconds to prevent uploads from hanging on network/config issues
+storage.maxUploadRetryTime = 5000;
+storage.maxOperationRetryTime = 5000;
 export { app };

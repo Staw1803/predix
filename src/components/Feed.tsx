@@ -120,6 +120,7 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [hasSeeded, setHasSeeded] = useState(false);
+  const [feedSort, setFeedSort] = useState<'recent' | 'popular'>('recent');
 
   const performAutoSeed = async () => {
     try {
@@ -167,6 +168,7 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
         const userIndex = i % 50;
         const author = generatedUsersData[userIndex];
         const content = POST_TEMPLATES[i % POST_TEMPLATES.length];
+        const commentsCount = Math.floor(Math.random() * 2) + 1;
 
         batch2.set(ref, {
           authorId: author.id,
@@ -176,9 +178,10 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
           content,
           monetized: Math.random() > 0.4,
           likesCount: Math.floor(Math.random() * 200 + 10),
+          commentsCount: commentsCount,
           timestamp: serverTimestamp()
         });
-        generatedPostRefs.push({ id: ref.id, authorId: author.id });
+        generatedPostRefs.push({ id: ref.id, authorId: author.id, commentsCount });
       }
       await batch2.commit();
       console.log('✅ Auto Seed: 50 Posts created.');
@@ -187,9 +190,8 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
       const batch3 = writeBatch(db);
       for (let i = 0; i < 50; i++) {
         const postData = generatedPostRefs[i];
+        const commentsCount = postData.commentsCount;
         
-        // Generate 1 to 2 comments per post
-        const commentsCount = Math.floor(Math.random() * 2) + 1;
         for (let c = 0; c < commentsCount; c++) {
           const commentRef = doc(collection(db, 'comments'));
           
@@ -320,23 +322,72 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
       setNewComment(''); setSubmittingComment(false); return;
     }
     try {
-      await addDoc(collection(db, 'comments'), {
-        postId: selectedPost.id, authorId: currentUser.id, authorName: currentUser.displayName,
-        authorHandle: currentUser.username, authorAvatar: currentUser.photoURL,
-        content: newComment.trim(), timestamp: serverTimestamp()
+      const batch = writeBatch(db);
+      const newCommentRef = doc(collection(db, 'comments'));
+      
+      batch.set(newCommentRef, {
+        postId: selectedPost.id, 
+        authorId: currentUser.id, 
+        authorName: currentUser.displayName,
+        authorHandle: currentUser.username, 
+        authorAvatar: currentUser.photoURL,
+        content: newComment.trim(), 
+        timestamp: serverTimestamp()
       });
+
+      const postRef = doc(db, 'posts', selectedPost.id);
+      batch.update(postRef, {
+        commentsCount: increment(1)
+      });
+
+      await batch.commit();
       setNewComment('');
-    } catch (err: any) { setToast({ message: 'Erro ao comentar.', type: 'error' }); }
-    finally { setSubmittingComment(false); }
+    } catch (err: any) { 
+      setToast({ message: 'Erro ao comentar.', type: 'error' }); 
+    } finally { 
+      setSubmittingComment(false); 
+    }
   };
+
+  const sortedPosts = [...posts].sort((a, b) => {
+    if (feedSort === 'recent') {
+      const timeA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+      const timeB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+      return timeB - timeA;
+    } else {
+      const scoreA = (a.likesCount || 0) + ((a as any).commentsCount || 0) * 2;
+      const scoreB = (b.likesCount || 0) + ((b as any).commentsCount || 0) * 2;
+      return scoreB - scoreA;
+    }
+  });
 
   return (
     <div className="flex-1 min-h-screen border-r border-zinc-800 bg-black min-w-0">
-      <div className="sticky top-0 z-30 bg-black/85 backdrop-blur-md border-b border-zinc-800 py-4 px-6">
-        <h1 className="text-lg font-black tracking-tight text-white select-none">Página Inicial</h1>
+      <div className="sticky top-0 z-30 bg-black/85 backdrop-blur-md border-b border-zinc-800 flex flex-col">
+        <div className="py-4 px-6 text-left">
+          <h1 className="text-lg font-black tracking-tight text-white select-none">Página Inicial</h1>
+        </div>
+        
+        {/* Sort Filter Tabs */}
+        <div className="flex border-t border-zinc-900">
+          <button
+            onClick={() => setFeedSort('recent')}
+            className="flex-1 py-3 text-xs font-black tracking-wider uppercase border-r border-zinc-900 transition-colors cursor-pointer text-center relative"
+          >
+            <span className={feedSort === 'recent' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}>Recentes</span>
+            {feedSort === 'recent' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-white rounded-full"></div>}
+          </button>
+          <button
+            onClick={() => setFeedSort('popular')}
+            className="flex-1 py-3 text-xs font-black tracking-wider uppercase transition-colors cursor-pointer text-center relative"
+          >
+            <span className={feedSort === 'popular' ? 'text-white font-black' : 'text-zinc-500 hover:text-zinc-300'}>Relevantes</span>
+            {feedSort === 'popular' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-white rounded-full"></div>}
+          </button>
+        </div>
       </div>
 
-      {currentUser && <CreatePost onPublishPost={handlePublishPost} userAvatar={currentUser.photoURL} />}
+      {currentUser && <CreatePost onPublishPost={handlePublishPost} userAvatar={currentUser.photoURL} setToast={setToast} />}
 
       <div className="flex flex-col">
         {loading ? (
@@ -344,12 +395,12 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             <span className="font-semibold text-xs">Carregando feed...</span>
           </div>
-        ) : posts.length === 0 ? (
+        ) : sortedPosts.length === 0 ? (
           <div className="text-center py-16 text-zinc-500 font-semibold border-b border-zinc-800">
-            Nenhum post ainda. Use "Gerar Dados Iniciais" na sidebar!
+            Nenhum post ainda.
           </div>
         ) : (
-          posts.map((post) => (
+          sortedPosts.map((post) => (
             <PostCard
               key={post.id}
               post={post}

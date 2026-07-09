@@ -6,9 +6,10 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage
 interface CreatePostProps {
   onPublishPost: (content: string, monetized: boolean, mediaURL?: string, mediaType?: 'image' | 'video') => Promise<void>;
   userAvatar: string;
+  setToast?: (toast: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
-export default function CreatePost({ onPublishPost, userAvatar }: CreatePostProps) {
+export default function CreatePost({ onPublishPost, userAvatar, setToast }: CreatePostProps) {
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [monetized, setMonetized] = useState(false);
@@ -51,8 +52,14 @@ export default function CreatePost({ onPublishPost, userAvatar }: CreatePostProp
       setMediaFile(null);
       setMediaPreview(null);
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error publishing post:', error);
+      if (setToast) {
+        setToast({ 
+          message: `Erro ao publicar: ${error.message || 'falha de upload'}. Verifique as regras do Firebase Storage.`, 
+          type: 'error' 
+        });
+      }
     } finally {
       setIsSubmitting(false);
       setUploadProgress(false);
