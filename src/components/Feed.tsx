@@ -97,6 +97,21 @@ const POST_TEMPLATES = [
   "Seja bem-vindo quem está entrando hoje! Me segue aí!"
 ];
 
+const COMMENT_TEMPLATES = [
+  "Concordo plenamente com isso! 👏",
+  "Não sei não... Acho que o resultado vai ser diferente.",
+  "Esse palpite é quente! Vou apostar algumas moedas nisso.",
+  "Melhor análise que vi hoje no Predix.",
+  "Estou de olho nessa previsão 👀",
+  "Com certeza! Quem não concorda está assistindo outro jogo kkk",
+  "Nossa, bem pensado! Não tinha analisado por esse lado.",
+  "O mercado de previsões vai ficar insano com essa call.",
+  "Já deixei minha gorjeta pelo post de alta qualidade!",
+  "Acompanhando de perto para ver no que dá.",
+  "Isso muda tudo! Obrigado por compartilhar.",
+  "Excelente post, direto ao ponto."
+];
+
 export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) {
   const [posts, setPosts] = useState<(Post & { authorName?: string; authorHandle?: string; authorAvatar?: string; monetized?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,12 +119,14 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
   const [comments, setComments] = useState<(Comment & { authorName?: string; authorHandle?: string; authorAvatar?: string })[]>([]);
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [hasSeeded, setHasSeeded] = useState(false);
 
   const performAutoSeed = async () => {
     try {
-      console.log('Database empty! Triggering automatic seed of 50 users and 50 posts...');
+      console.log('Database needs seeding! Triggering automatic seed of 50 users, 50 posts, and comments...');
+      
+      // Batch 1: Create 50 Users
       const batch1 = writeBatch(db);
-      const createdUserIds: string[] = [];
       const generatedUsersData: any[] = [];
 
       for (let i = 0; i < 50; i++) {
@@ -136,12 +153,15 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
         };
 
         batch1.set(ref, userData);
-        createdUserIds.push(ref.id);
         generatedUsersData.push(userData);
       }
       await batch1.commit();
+      console.log('✅ Auto Seed: 50 Users created.');
 
+      // Batch 2: Create 50 Posts
       const batch2 = writeBatch(db);
+      const generatedPostRefs: any[] = [];
+
       for (let i = 0; i < 50; i++) {
         const ref = doc(collection(db, 'posts'));
         const userIndex = i % 50;
@@ -158,9 +178,42 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
           likesCount: Math.floor(Math.random() * 200 + 10),
           timestamp: serverTimestamp()
         });
+        generatedPostRefs.push({ id: ref.id, authorId: author.id });
       }
       await batch2.commit();
-      console.log('✅ Auto Seed Completed!');
+      console.log('✅ Auto Seed: 50 Posts created.');
+
+      // Batch 3: Create Comments for each Post
+      const batch3 = writeBatch(db);
+      for (let i = 0; i < 50; i++) {
+        const postData = generatedPostRefs[i];
+        
+        // Generate 1 to 2 comments per post
+        const commentsCount = Math.floor(Math.random() * 2) + 1;
+        for (let c = 0; c < commentsCount; c++) {
+          const commentRef = doc(collection(db, 'comments'));
+          
+          // Select a random user that is not the author of the post
+          let commentUserIndex = Math.floor(Math.random() * 50);
+          if (generatedUsersData[commentUserIndex].id === postData.authorId) {
+            commentUserIndex = (commentUserIndex + 1) % 50;
+          }
+          const commentUser = generatedUsersData[commentUserIndex];
+          const commentContent = COMMENT_TEMPLATES[Math.floor(Math.random() * COMMENT_TEMPLATES.length)];
+
+          batch3.set(commentRef, {
+            postId: postData.id,
+            authorId: commentUser.id,
+            authorName: commentUser.displayName,
+            authorHandle: commentUser.username,
+            authorAvatar: commentUser.photoURL,
+            content: commentContent,
+            timestamp: serverTimestamp()
+          });
+        }
+      }
+      await batch3.commit();
+      console.log('✅ Auto Seed: Comments created successfully!');
     } catch (err) {
       console.error('Error during auto seed:', err);
     }
@@ -187,7 +240,8 @@ export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) 
       setPosts(postsList);
       setLoading(false);
 
-      if (snap.empty) {
+      if (postsList.length < 30 && !hasSeeded) {
+        setHasSeeded(true);
         await performAutoSeed();
       }
     }, (err) => {
