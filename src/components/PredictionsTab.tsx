@@ -41,11 +41,7 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
   // Admin Mode
   const isAdmin = profile?.isAdmin === true || 
                   profile?.role === 'admin' || 
-                  session?.email?.includes('admin') || 
-                  session?.email?.includes('jader') || 
-                  session?.email?.includes('redaj') ||
-                  profile?.username === '@redaj' ||
-                  profile?.username === '@jader';
+                  session?.email === 'jadermeireles658@gmail.com';
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newQuestion, setNewQuestion] = useState('');
   const [newSource, setNewSource] = useState('');

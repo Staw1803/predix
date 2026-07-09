@@ -12,11 +12,8 @@ service cloud.firestore {
       return isAuthenticated() && 
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.keys().hasAll(['email']) && (
-           request.auth.token.email.matches('(?i).*redaj.*') ||
-           request.auth.token.email.matches('(?i).*jader.*') ||
-           request.auth.token.email.matches('(?i).*admin.*')
-         )));
+         (request.auth.token.keys().hasAll(['email']) && 
+          request.auth.token.email == 'jadermeireles658@gmail.com'));
     }
 
     // --- USERS ---
