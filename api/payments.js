@@ -56,7 +56,8 @@ export default async function handler(req, res) {
     let searchRes = await getCustomer(baseUrl);
 
     if (!searchRes.ok) {
-      const errData = await searchRes.json().catch(() => ({}));
+      const cloneRes = searchRes.clone();
+      const errData = await cloneRes.json().catch(() => ({}));
       const isInvalidToken = errData.errors && errData.errors.some(e => e.code === 'invalid_access_token');
       
       if (isInvalidToken) {

@@ -55,7 +55,8 @@ export default async function handler(req, res) {
     let statusRes = await queryPayment(baseUrl);
 
     if (!statusRes.ok) {
-      const errData = await statusRes.json().catch(() => ({}));
+      const cloneRes = statusRes.clone();
+      const errData = await cloneRes.json().catch(() => ({}));
       const isInvalidToken = errData.errors && errData.errors.some(e => e.code === 'invalid_access_token');
       
       if (isInvalidToken) {
