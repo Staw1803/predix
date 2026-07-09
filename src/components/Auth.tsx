@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithRedirect, 
+  signInWithPopup,
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -78,9 +79,18 @@ export default function Auth({ setToast }: AuthProps) {
     setLoading(true);
     try {
       const providerInstance = new GoogleAuthProvider();
-      // Use redirect for better mobile support instead of popup
-      await signInWithRedirect(auth, providerInstance);
-      // The rest is handled by onAuthStateChanged in App.tsx when they return
+      try {
+        // Try popup login first for frictionless desktop sign-in
+        await signInWithPopup(auth, providerInstance);
+        setToast({ message: 'Login efetuado com sucesso!', type: 'success' });
+      } catch (popupErr: any) {
+        // Fallback to redirect if popup is blocked
+        if (popupErr.code === 'auth/popup-blocked') {
+          await signInWithRedirect(auth, providerInstance);
+        } else {
+          throw popupErr;
+        }
+      }
     } catch (err: any) {
       setToast({ message: `Erro ao iniciar Google Login: ${err.message}`, type: 'error' });
       setLoading(false);
