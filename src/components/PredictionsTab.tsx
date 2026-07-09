@@ -38,7 +38,7 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'open' | 'resolved'>('open');
   
-  // Admin Mode
+  // Admin Mode (Restricted strictly to the main email)
   const isAdmin = profile?.isAdmin === true || 
                   profile?.role === 'admin' || 
                   session?.email === 'jadermeireles658@gmail.com';
@@ -113,7 +113,6 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
     e.preventDefault();
     if (!newQuestion.trim() || !newSource.trim()) return;
 
-    // Filter out empty options
     const filteredOptions = customOptions.map(o => o.trim()).filter(o => o.length > 0);
     if (filteredOptions.length < 2) {
       setToast({ message: 'A enquete precisa ter no mínimo 2 opções válidas.', type: 'error' });
@@ -121,7 +120,6 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
     }
 
     try {
-      // Build pools map
       const poolsMap: Record<string, number> = {};
       filteredOptions.forEach(opt => {
         poolsMap[opt] = 0;
@@ -210,8 +208,6 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
     if (!pred) return;
 
     const pools = pred.pools || {};
-    
-    // Sum total pool
     const totalPool = Object.values(pools).reduce((a: any, b: any) => a + b, 0) as number;
     const winningPool = (pools[outcome] || 0) as number;
 
@@ -221,7 +217,6 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
       const snap = await getDocs(betsRef);
       const batch = writeBatch(db);
 
-      // Distribute payouts if winning pool exists
       if (winningPool > 0 && totalPool > 0) {
         const multiplier = totalPool / winningPool;
 
@@ -279,7 +274,6 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
       const snap = await getDocs(betsRef);
       const batch = writeBatch(db);
 
-      // Refund everyone
       for (const docBet of snap.docs) {
         const bet = docBet.data();
         const userRef = doc(db, 'users', bet.userId);
@@ -288,7 +282,6 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
         });
       }
 
-      // Mark prediction as canceled
       const predRef = doc(db, 'predictions', predictionId);
       batch.update(predRef, {
         status: 'canceled',
@@ -312,48 +305,48 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
   });
 
   return (
-    <div className="flex-1 flex flex-col bg-black">
+    <div className="flex-1 flex flex-col bg-black w-full max-w-full overflow-x-hidden min-w-0">
       
       {/* Tab Header Banner */}
-      <div className="border-b border-zinc-800 p-4 sticky top-0 bg-black/80 backdrop-blur-md z-10 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-black text-white flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-sky-400" />
+      <div className="border-b border-zinc-800 p-4 sticky top-0 bg-black/85 backdrop-blur-md z-10 flex flex-col gap-2 w-full max-w-full overflow-x-hidden min-w-0">
+        <div className="flex items-center justify-between w-full">
+          <h2 className="text-lg font-black text-white flex items-center gap-2 select-none">
+            <TrendingUp className="w-5 h-5 text-sky-400 stroke-[2.5]" />
             Mercado de Previsões P2P
           </h2>
           
           {isAdmin && (
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black font-extrabold text-xs hover:bg-zinc-200 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-black font-extrabold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shrink-0"
             >
-              {showCreateForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              {showCreateForm ? <X className="w-3.5 h-3.5 stroke-[2.5]" /> : <Plus className="w-3.5 h-3.5 stroke-[2.5]" />}
               <span>{showCreateForm ? 'Fechar' : 'Nova Previsão'}</span>
             </button>
           )}
         </div>
-        <p className="text-xs text-zinc-550 leading-relaxed text-left">
-          Preveja o resultado de eventos reais usando seus créditos. Escolha a sua opção e ganhe a fatia do pote se vencer!
+        <p className="text-[11px] text-zinc-550 leading-relaxed text-left max-w-xl">
+          Preveja o resultado de eventos reais. Escolha a sua opção e ganhe a fatia do pote de apostas perdedoras se vencer!
         </p>
 
         {/* Tab Toggle Switch */}
-        <div className="flex gap-2 mt-2">
+        <div className="flex gap-2 mt-2 w-full">
           <button
             onClick={() => setActiveSubTab('open')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer border ${
               activeSubTab === 'open' 
-                ? 'bg-zinc-900 text-white border border-zinc-800' 
-                : 'text-zinc-500 hover:text-zinc-300'
+                ? 'bg-zinc-900 text-white border-zinc-800 shadow-md' 
+                : 'text-zinc-500 hover:text-zinc-300 border-transparent'
             }`}
           >
             Abertas
           </button>
           <button
             onClick={() => setActiveSubTab('resolved')}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer border ${
               activeSubTab === 'resolved' 
-                ? 'bg-zinc-900 text-white border border-zinc-800' 
-                : 'text-zinc-500 hover:text-zinc-300'
+                ? 'bg-zinc-900 text-white border-zinc-800 shadow-md' 
+                : 'text-zinc-500 hover:text-zinc-300 border-transparent'
             }`}
           >
             Histórico/Encerradas
@@ -363,43 +356,43 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
 
       {/* Admin Create Form */}
       {isAdmin && showCreateForm && (
-        <form onSubmit={handleCreatePrediction} className="border-b border-zinc-800 p-4 bg-zinc-950/45 text-left flex flex-col gap-4">
-          <h3 className="text-sm font-black text-white flex items-center gap-1.5">
-            <Plus className="w-4 h-4 text-sky-400" />
+        <form onSubmit={handleCreatePrediction} className="border-b border-zinc-800 p-5 bg-zinc-950/45 text-left flex flex-col gap-4 w-full max-w-full overflow-x-hidden min-w-0">
+          <h3 className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-widest text-zinc-300">
+            <Plus className="w-4 h-4 text-sky-400 stroke-[2.5]" />
             Criar Mercado de Previsão
           </h3>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase">Pergunta da Enquete</label>
+          <div className="flex flex-col gap-1.5 w-full">
+            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Pergunta da Enquete</label>
             <input
               type="text"
               required
               value={newQuestion}
               onChange={e => setNewQuestion(e.target.value)}
               placeholder="Ex: O Barcelona vai vencer o Real Madrid hoje?"
-              className="bg-black border border-zinc-850 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
+              className="bg-black border border-zinc-850 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-700 focus:outline-none focus:border-sky-500 transition-colors w-full"
             />
           </div>
 
-          <div className="flex gap-3">
-            <div className="flex-1 flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase">Fonte de Resolução Oficial</label>
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+              <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Fonte de Resolução Oficial</label>
               <input
                 type="text"
                 required
                 value={newSource}
                 onChange={e => setNewSource(e.target.value)}
                 placeholder="Ex: Site da La Liga / Globo Esporte"
-                className="bg-black border border-zinc-850 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-700"
+                className="bg-black border border-zinc-850 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-700 focus:outline-none focus:border-sky-500 transition-colors w-full min-w-0"
               />
             </div>
 
-            <div className="flex flex-col gap-1 shrink-0">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase">Categoria</label>
+            <div className="flex flex-col gap-1.5 shrink-0 min-w-[120px]">
+              <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Categoria</label>
               <select
                 value={newCategory}
                 onChange={e => setNewCategory(e.target.value)}
-                className="bg-black border border-zinc-850 rounded-xl px-3 py-2 text-xs text-white focus:outline-none cursor-pointer"
+                className="bg-black border border-zinc-850 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors cursor-pointer w-full"
               >
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -407,11 +400,11 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
           </div>
 
           {/* DYNAMIC POLL OPTIONS */}
-          <div className="flex flex-col gap-2 border-t border-zinc-900 pt-3">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase">Opções da Enquete (Mínimo 2)</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="flex flex-col gap-2 border-t border-zinc-900 pt-4 w-full">
+            <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Opções da Enquete (Mínimo 2)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
               {customOptions.map((opt, idx) => (
-                <div key={idx} className="flex items-center gap-1.5">
+                <div key={idx} className="flex items-center gap-2 w-full min-w-0">
                   <input
                     type="text"
                     required
@@ -422,15 +415,15 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
                       setCustomOptions(newOpts);
                     }}
                     placeholder={`Opção ${idx + 1}`}
-                    className="bg-black border border-zinc-850 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-zinc-700 flex-1"
+                    className="bg-black border border-zinc-850 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors flex-1 min-w-0"
                   />
                   {customOptions.length > 2 && (
                     <button
                       type="button"
                       onClick={() => setCustomOptions(customOptions.filter((_, i) => i !== idx))}
-                      className="p-2 rounded-lg bg-zinc-900 border border-zinc-850 text-zinc-500 hover:text-white transition-colors cursor-pointer"
+                      className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-850 text-zinc-500 hover:text-white transition-colors cursor-pointer shrink-0"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
@@ -440,15 +433,15 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
             <button
               type="button"
               onClick={() => setCustomOptions([...customOptions, ''])}
-              className="text-xs text-sky-400 hover:text-sky-350 font-bold self-start mt-1 cursor-pointer flex items-center gap-1"
+              className="text-xs text-sky-400 hover:text-sky-350 font-black self-start mt-2 cursor-pointer flex items-center gap-1"
             >
-              <Plus className="w-3.5 h-3.5" /> Adicionar Opção
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Adicionar Opção
             </button>
           </div>
 
           <button
             type="submit"
-            className="self-end px-5 py-2 rounded-full bg-white text-black font-extrabold text-xs hover:bg-zinc-200 transition-colors cursor-pointer"
+            className="self-end px-6 py-2.5 rounded-full bg-white text-black font-extrabold text-xs hover:bg-zinc-200 transition-colors cursor-pointer shrink-0"
           >
             Publicar Mercado
           </button>
@@ -456,15 +449,15 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
       )}
 
       {/* Predictions list */}
-      <div className="flex-1 p-4 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-140px)]">
+      <div className="flex-1 p-4 flex flex-col gap-4 overflow-y-auto w-full max-w-full overflow-x-hidden min-w-0">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
-            <HelpCircle className="w-8 h-8 animate-spin mb-2" />
-            <span className="text-sm font-semibold">Carregando previsões...</span>
+          <div className="flex flex-col items-center justify-center py-20 text-zinc-500 w-full">
+            <HelpCircle className="w-8 h-8 animate-spin mb-2 text-zinc-650" />
+            <span className="text-xs font-semibold">Carregando previsões...</span>
           </div>
         ) : filteredPredictions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-zinc-500 border border-zinc-900 rounded-3xl p-6 bg-zinc-950/20">
-            <HelpCircle className="w-8 h-8 stroke-[1.5] mb-2 text-zinc-750" />
+          <div className="flex flex-col items-center justify-center py-20 text-zinc-550 border border-zinc-900 rounded-3xl p-6 bg-zinc-950/20 w-full">
+            <HelpCircle className="w-8 h-8 stroke-[1.5] mb-2 text-zinc-800" />
             <span className="text-sm font-black text-zinc-450">Nenhuma previsão disponível</span>
             <span className="text-xs text-zinc-600 mt-1">Novos mercados e enquetes serão adicionados em breve!</span>
           </div>
@@ -477,149 +470,144 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
             const userBet = userBets[pred.id] || {};
 
             return (
-              <div key={pred.id} className="border border-zinc-900 rounded-3xl p-5 bg-zinc-950/10 flex flex-col gap-4 text-left">
+              <div key={pred.id} className="border border-zinc-900 rounded-3xl p-5 bg-zinc-950/15 flex flex-col gap-4 text-left w-full max-w-full overflow-x-hidden min-w-0 hover:border-zinc-850 transition-all duration-200">
                 
                 {/* Meta details */}
-                <div className="flex items-center justify-between text-[10px] font-bold tracking-wider uppercase text-zinc-550">
-                  <span className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-850 text-zinc-400">{pred.category}</span>
-                  <span className="flex items-center gap-1">
-                    <Globe className="w-3.5 h-3.5 text-zinc-650" />
-                    Fonte: {pred.source}
+                <div className="flex items-center justify-between text-[9px] font-black tracking-wider uppercase text-zinc-500 w-full min-w-0">
+                  <span className="px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-850 text-zinc-400 shrink-0">{pred.category}</span>
+                  <span className="flex items-center gap-1 truncate ml-2">
+                    <Globe className="w-3.5 h-3.5 text-zinc-650 shrink-0" />
+                    <span className="truncate">Fonte: {pred.source}</span>
                   </span>
                 </div>
 
                 {/* Question */}
-                <h4 className="text-base font-black text-white leading-snug">{pred.question}</h4>
+                <h4 className="text-sm sm:text-base font-black text-white leading-snug w-full break-words select-none">{pred.question}</h4>
 
-                {/* Pools Status */}
-                <div className="flex flex-col gap-3">
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Opções & Distribuição</span>
-                  <div className="flex flex-col gap-2.5">
-                    {options.map((opt: string) => {
-                      const optPool = pools[opt] || 0;
-                      const percent = total > 0 ? Math.round((optPool / total) * 100) : 0;
-                      const payoutMultiplier = optPool > 0 ? (total / optPool).toFixed(2) : (2.00).toFixed(2);
+                {/* Interactive Twitter-style Poll Options */}
+                <div className="flex flex-col gap-2 w-full">
+                  {options.map((opt: string) => {
+                    const optPool = pools[opt] || 0;
+                    const percent = total > 0 ? Math.round((optPool / total) * 100) : 0;
+                    const payoutMultiplier = optPool > 0 ? (total / optPool).toFixed(2) : '2.00';
+                    const userAmt = userBet[opt] || 0;
+                    const isWinningOption = pred.status === 'resolved' && pred.outcome === opt;
 
-                      return (
-                        <div key={opt} className="flex flex-col gap-1 text-xs">
-                          <div className="flex justify-between font-extrabold text-zinc-400">
-                            <span className="text-zinc-200">{opt} ({percent}%)</span>
-                            <span className="text-zinc-550 tabular-nums">Pote: {optPool.toLocaleString()} moedas</span>
-                          </div>
-                          
-                          {/* Progress Bar */}
-                          <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden flex border border-zinc-850">
-                            <div className="bg-sky-500 h-full transition-all duration-300" style={{ width: `${percent}%` }}></div>
-                          </div>
-                          
-                          <div className="text-[10px] text-zinc-600 text-left font-semibold">
-                            Retorno: {payoutMultiplier}x se vencer
-                          </div>
+                    return (
+                      <button
+                        key={opt}
+                        onClick={() => {
+                          if (pred.status === 'open') {
+                            setBettingPredictionId(pred.id);
+                            setBetOption(opt);
+                            setBetAmount(10);
+                          }
+                        }}
+                        disabled={pred.status !== 'open'}
+                        className={`group relative w-full text-left p-3.5 rounded-2xl border transition-all duration-200 overflow-hidden flex items-center justify-between min-w-0 ${
+                          pred.status === 'open' 
+                            ? 'bg-zinc-950/60 hover:bg-zinc-900/30 border-zinc-900 hover:border-zinc-800 cursor-pointer'
+                            : isWinningOption 
+                              ? 'bg-sky-950/20 border-sky-900/40 text-sky-400 cursor-default'
+                              : 'bg-zinc-950/30 border-zinc-900/40 opacity-50 cursor-default'
+                        }`}
+                      >
+                        {/* Progress Bar Background fill */}
+                        <div 
+                          className={`absolute inset-y-0 left-0 transition-all duration-500 rounded-r-md ${
+                            isWinningOption ? 'bg-sky-500/25' : 'bg-zinc-900/50'
+                          }`}
+                          style={{ width: `${percent}%` }}
+                        />
+                        
+                        {/* Left Info: Name & User Bet tag */}
+                        <div className="relative flex flex-col min-w-0 z-10">
+                          <span className="font-extrabold text-white text-xs sm:text-sm truncate select-none">{opt}</span>
+                          {userAmt > 0 && (
+                            <span className="text-[10px] text-sky-400 font-black flex items-center gap-1 mt-0.5">
+                              <Coins className="w-3 h-3 text-amber-400" /> Sua aposta: {userAmt.toLocaleString()} moedas
+                            </span>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="text-xs text-zinc-500 font-bold mt-1">
-                    Total Acumulado: {total.toLocaleString()} moedas
-                  </div>
+
+                        {/* Right Info: Percentage & Multipliers */}
+                        <div className="relative flex flex-col items-end z-10 shrink-0 text-right ml-4">
+                          <span className="text-xs sm:text-sm font-black text-white tabular-nums">{percent}%</span>
+                          <span className="text-[9px] text-zinc-500 font-bold tracking-tight">
+                            {payoutMultiplier}x • Pote: {optPool.toLocaleString()}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* User placed bet info */}
-                {Object.keys(userBet).length > 0 && (
-                  <div className="p-3 rounded-2xl bg-zinc-900/50 border border-zinc-850 flex flex-col gap-1 text-xs">
-                    <span className="text-zinc-400 font-bold uppercase text-[9px] tracking-wider">Suas apostas ativas:</span>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-white font-extrabold mt-1">
-                      {Object.entries(userBet).map(([opt, amt]) => (
-                        amt > 0 && (
-                          <span key={opt} className="text-sky-400">
-                            {opt}: {amt.toLocaleString()} moedas
-                          </span>
-                        )
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Total Stats summary */}
+                <div className="text-[10px] text-zinc-500 font-bold select-none text-left">
+                  Total Acumulado: {total.toLocaleString()} moedas
+                </div>
 
-                {/* Betting Action Area */}
-                {pred.status === 'open' && (
-                  <div className="flex flex-col gap-3 border-t border-zinc-900 pt-4">
-                    {bettingPredictionId === pred.id ? (
-                      <div className="flex flex-col gap-3 animate-fade-in">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-zinc-400">
-                            Apostando em <strong className="text-sky-400 font-black">"{betOption}"</strong>
-                          </span>
-                          <button
-                            onClick={() => { setBettingPredictionId(null); setBetOption(null); }}
-                            className="p-1 rounded-full hover:bg-zinc-900 text-zinc-500 hover:text-white transition-colors cursor-pointer"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 flex items-center bg-black border border-zinc-850 rounded-full px-4 py-2">
-                            <Coins className="w-4 h-4 text-amber-400 mr-2" />
-                            <input
-                              type="number"
-                              min={1}
-                              max={balance}
-                              value={betAmount}
-                              onChange={e => setBetAmount(Math.min(balance, Math.max(1, parseInt(e.target.value) || 0)))}
-                              className="w-full bg-transparent focus:outline-none text-white font-black text-sm"
-                            />
-                            <span className="text-xs text-zinc-500 font-bold shrink-0">Saldo: {balance.toLocaleString()}</span>
-                          </div>
-                          
-                          <button
-                            onClick={handlePlaceBet}
-                            disabled={submittingBet || betAmount <= 0}
-                            className="px-5 py-2.5 rounded-full bg-white text-black font-extrabold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 cursor-pointer"
-                          >
-                            Apostar
-                          </button>
-                        </div>
+                {/* Betting input sheet */}
+                {pred.status === 'open' && bettingPredictionId === pred.id && (
+                  <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-850 flex flex-col gap-3 animate-in slide-in-from-top-2 duration-200 w-full">
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-bold text-zinc-400 select-none">
+                        Quanto deseja apostar em <strong className="text-sky-400">"{betOption}"</strong>?
+                      </span>
+                      <button
+                        onClick={() => { setBettingPredictionId(null); setBetOption(null); }}
+                        className="p-1 rounded-full hover:bg-zinc-900 text-zinc-500 hover:text-white transition-colors cursor-pointer shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="flex-1 flex items-center bg-black border border-zinc-800 rounded-full px-4 py-2 min-w-0">
+                        <Coins className="w-4 h-4 text-amber-400 mr-2 shrink-0" />
+                        <input
+                          type="number"
+                          min={1}
+                          max={balance}
+                          value={betAmount}
+                          onChange={e => setBetAmount(Math.min(balance, Math.max(1, parseInt(e.target.value) || 0)))}
+                          className="w-full bg-transparent focus:outline-none text-white font-black text-sm min-w-0"
+                        />
+                        <span className="text-[10px] text-zinc-550 font-bold shrink-0 ml-2 select-none">Saldo: {balance.toLocaleString()}</span>
                       </div>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Apostar na Enquete</span>
-                        <div className="flex flex-wrap gap-2">
-                          {options.map((opt: string) => (
-                            <button
-                              key={opt}
-                              onClick={() => { setBettingPredictionId(pred.id); setBetOption(opt); setBetAmount(10); }}
-                              className="py-2 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-850 hover:border-zinc-700 text-zinc-200 font-bold text-xs transition-all active:scale-[0.98] cursor-pointer"
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                      
+                      <button
+                        onClick={handlePlaceBet}
+                        disabled={submittingBet || betAmount <= 0}
+                        className="px-5 py-2.5 rounded-full bg-white text-black font-extrabold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 cursor-pointer shrink-0"
+                      >
+                        Apostar
+                      </button>
+                    </div>
                   </div>
                 )}
 
                 {/* Admin Actions Area */}
                 {isAdmin && pred.status === 'open' && (
-                  <div className="flex flex-col gap-2 border-t border-zinc-900 pt-3">
-                    <span className="text-[9px] font-black tracking-wider uppercase text-zinc-550">Controle do Administrador (Escolha a vencedora)</span>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-2.5 border-t border-zinc-900 pt-4 w-full">
+                    <span className="text-[9px] font-black tracking-wider uppercase text-zinc-550 select-none">Controle do Administrador (Encerrar Mercado)</span>
+                    <div className="flex flex-wrap gap-2 w-full">
                       {options.map((opt: string) => (
                         <button
                           key={opt}
                           onClick={() => handleResolvePrediction(pred.id, opt)}
-                          className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2 rounded-xl bg-sky-500/10 border border-sky-500/30 hover:bg-sky-500/20 text-sky-400 text-xs font-bold transition-colors cursor-pointer"
+                          className="flex-1 min-w-[100px] max-w-full flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-sky-500/10 border border-sky-500/30 hover:bg-sky-500/20 text-sky-400 text-xs font-bold transition-all cursor-pointer truncate"
+                          title={`Marcar ${opt} como vencedor`}
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          "{opt}" Venceu
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">"{opt}" venceu</span>
                         </button>
                       ))}
                       <button
                         onClick={() => handleCancelPrediction(pred.id)}
-                        className="py-2 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition-colors cursor-pointer"
-                        title="Cancelar e reembolsar todos"
+                        className="py-2 px-4 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
                       >
-                        Cancelar Enquete
+                        Cancelar Mercado
                       </button>
                     </div>
                   </div>
@@ -627,9 +615,9 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
 
                 {/* Outcome Display (Resolved) */}
                 {pred.status === 'resolved' && (
-                  <div className="flex items-center gap-2 border-t border-zinc-900 pt-4 text-xs font-extrabold">
+                  <div className="flex items-center gap-2 border-t border-zinc-900 pt-4 text-xs font-extrabold select-none">
                     <span className="text-zinc-500">Resultado Oficial:</span>
-                    <span className="px-3 py-1 rounded-full text-xs font-black bg-sky-950/30 text-sky-400 border border-sky-900/40">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black bg-sky-950/30 text-sky-400 border border-sky-900/40 uppercase">
                       "{pred.outcome}" VENCEU
                     </span>
                   </div>
@@ -637,8 +625,8 @@ export default function PredictionsTab({ session, profile, balance, setToast, on
 
                 {/* Outcome Display (Canceled) */}
                 {pred.status === 'canceled' && (
-                  <div className="flex items-center gap-2 border-t border-zinc-900 pt-4 text-xs font-extrabold text-zinc-500">
-                    <XCircle className="w-4 h-4 text-zinc-650" />
+                  <div className="flex items-center gap-2 border-t border-zinc-900 pt-4 text-xs font-extrabold text-zinc-500 select-none">
+                    <XCircle className="w-4 h-4 text-zinc-650 shrink-0" />
                     <span>Mercado Cancelado e Apostas Reembolsadas</span>
                   </div>
                 )}
