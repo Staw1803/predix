@@ -36,24 +36,38 @@ export default async function handler(req, res) {
     // Read Asaas credentials
     const asaasApiKey = process.env.ASAAS_API_KEY || '89db5943-51f1-41e6-8f5b-1c31bcc36b1c';
     
-    // Auto-detect environment based on key prefix
-    const isSandbox = asaasApiKey.startsWith('$aact_hmlg_') || asaasApiKey.startsWith('$');
-    const baseUrl = isSandbox ? 'https://api-sandbox.asaas.com/v3' : 'https://api.asaas.com/v3';
+    // Default to Production URL, will fallback to Sandbox if token is invalid on Production
+    let baseUrl = 'https://api.asaas.com/v3';
 
-    // Query Asaas payment status
-    const searchUrl = `${baseUrl}/payments/${txid}`;
-    const statusRes = await fetch(searchUrl, {
-      method: 'GET',
-      headers: {
-        'access_token': asaasApiKey,
-        'Content-Type': 'application/json',
-        'User-Agent': 'PredixApp'
+    // Helper to query payment status from Asaas
+    const queryPayment = async (url) => {
+      return fetch(`${url}/payments/${txid}`, {
+        method: 'GET',
+        headers: {
+          'access_token': asaasApiKey,
+          'Content-Type': 'application/json',
+          'User-Agent': 'PredixApp'
+        }
+      });
+    };
+
+    // Try querying Production
+    let statusRes = await queryPayment(baseUrl);
+
+    if (!statusRes.ok) {
+      const errData = await statusRes.json().catch(() => ({}));
+      const isInvalidToken = errData.errors && errData.errors.some(e => e.code === 'invalid_access_token');
+      
+      if (isInvalidToken) {
+        // Fallback: Try Sandbox environment
+        baseUrl = 'https://api-sandbox.asaas.com/v3';
+        statusRes = await queryPayment(baseUrl);
       }
-    });
+    }
 
     if (!statusRes.ok) {
       const errDetails = await statusRes.text();
-      throw new Error(`Failed to fetch Asaas payment status: ${errDetails}`);
+      throw new Error(`Asaas API Key is invalid or rejected in both environments: ${errDetails}`);
     }
 
     const paymentData = await statusRes.json();

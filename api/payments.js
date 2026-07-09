@@ -36,27 +36,44 @@ export default async function handler(req, res) {
     // Read Asaas credentials
     const asaasApiKey = process.env.ASAAS_API_KEY || '89db5943-51f1-41e6-8f5b-1c31bcc36b1c';
     
-    // Auto-detect environment based on key prefix
-    const isSandbox = asaasApiKey.startsWith('$aact_hmlg_') || asaasApiKey.startsWith('$');
-    const baseUrl = isSandbox ? 'https://api-sandbox.asaas.com/v3' : 'https://api.asaas.com/v3';
-
-    // 2. Find or Create Default Customer "Cliente Predix"
+    // Default to Production URL, will fallback to Sandbox if token is invalid on Production
+    let baseUrl = 'https://api.asaas.com/v3';
     let customerId = null;
-    const searchUrl = `${baseUrl}/customers?name=${encodeURIComponent('Cliente Predix')}`;
-    const searchRes = await fetch(searchUrl, {
-      method: 'GET',
-      headers: {
-        'access_token': asaasApiKey,
-        'Content-Type': 'application/json',
-        'User-Agent': 'PredixApp'
-      }
-    });
 
-    if (searchRes.ok) {
-      const searchData = await searchRes.json();
-      if (searchData.data && searchData.data.length > 0) {
-        customerId = searchData.data[0].id;
+    // Helper to fetch customer from Asaas
+    const getCustomer = async (url) => {
+      return fetch(`${url}/customers?name=${encodeURIComponent('Cliente Predix')}`, {
+        method: 'GET',
+        headers: {
+          'access_token': asaasApiKey,
+          'Content-Type': 'application/json',
+          'User-Agent': 'PredixApp'
+        }
+      });
+    };
+
+    // Try querying Production
+    let searchRes = await getCustomer(baseUrl);
+
+    if (!searchRes.ok) {
+      const errData = await searchRes.json().catch(() => ({}));
+      const isInvalidToken = errData.errors && errData.errors.some(e => e.code === 'invalid_access_token');
+      
+      if (isInvalidToken) {
+        // Fallback: Try Sandbox environment
+        baseUrl = 'https://api-sandbox.asaas.com/v3';
+        searchRes = await getCustomer(baseUrl);
       }
+    }
+
+    if (!searchRes.ok) {
+      const errDetails = await searchRes.text();
+      throw new Error(`Asaas API Key is invalid or rejected in both environments: ${errDetails}`);
+    }
+
+    const searchData = await searchRes.json();
+    if (searchData.data && searchData.data.length > 0) {
+      customerId = searchData.data[0].id;
     }
 
     // Create customer if not found
