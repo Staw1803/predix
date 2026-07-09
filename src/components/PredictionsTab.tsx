@@ -5,7 +5,6 @@ import {
   doc, 
   addDoc, 
   getDocs, 
-  updateDoc, 
   onSnapshot, 
   query, 
   orderBy, 
@@ -18,13 +17,9 @@ import {
   TrendingUp, 
   Globe, 
   Coins, 
-  AlertCircle, 
   Plus, 
-  Check, 
   X, 
-  ChevronRight, 
   HelpCircle,
-  Clock,
   CheckCircle2,
   XCircle
 } from 'lucide-react';
