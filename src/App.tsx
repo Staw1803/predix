@@ -316,7 +316,7 @@ function App() {
   const activeAvatar = profile?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
 
   // Maintenance Mode Override (Change to false to put the site back online)
-  const IS_MAINTENANCE_MODE = true;
+  const IS_MAINTENANCE_MODE = false;
 
   if (IS_MAINTENANCE_MODE) {
     return (
