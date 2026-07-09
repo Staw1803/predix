@@ -10,6 +10,7 @@ import ProfilePage from './components/ProfilePage';
 import { auth, db, isFirebaseConfigured } from './firebaseClient';
 import { MOEDA_VALOR_REAL } from './constants';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { generateUniqueUsername } from './utils';
 import { 
   doc, 
   getDoc, 
@@ -17,7 +18,6 @@ import {
   updateDoc
 } from 'firebase/firestore';
 import { 
-  LogOut, 
   QrCode,
   Copy,
   Check,
@@ -35,6 +35,19 @@ function App() {
   const [balance, setBalance] = useState<number>(0); 
   const [activeTab, setActiveTab] = useState<string>('feed');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+
+  const navigateToProfile = (userId: string) => {
+    setViewingUserId(userId);
+    setActiveTab('profile');
+  };
+
+  const handleTabChange = (tab: string) => {
+    if (tab === 'profile') {
+      setViewingUserId(null); // defaults to own profile
+    }
+    setActiveTab(tab);
+  };
 
   // Store & Checkout States
   const [checkoutPackage, setCheckoutPackage] = useState<{ name: string; coins: number; price: number; qrCode: string; qrCodeBase64: string; txid: string } | null>(null);
@@ -87,11 +100,12 @@ function App() {
         
       } else {
         // Auto-create missing user in database to heal old or partial session states
-        const usernameVal = session?.email?.split('@')[0] || 'user';
+        const baseVal = session?.displayName || session?.email?.split('@')[0] || 'user';
+        const usernameVal = await generateUniqueUsername(baseVal);
         const fallbackProfile = {
           id: userId,
-          username: usernameVal.startsWith('@') ? usernameVal : `@${usernameVal}`,
-          displayName: session?.displayName || usernameVal,
+          username: usernameVal,
+          displayName: session?.displayName || baseVal,
           photoURL: session?.photoURL || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80`,
           credits: 0
         };
@@ -272,7 +286,7 @@ function App() {
         <Sidebar
           credits={balance}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleTabChange}
           username={activeName}
           userHandle={activeHandle}
           userAvatar={activeAvatar}
@@ -294,6 +308,7 @@ function App() {
               } : null}
               setToast={setToast}
               onSeedReady={(fn) => { seedFnRef.current = fn; }}
+              onUserClick={navigateToProfile}
             />
           )}
 
@@ -337,7 +352,7 @@ function App() {
                     {/* Mini - R$5 */}
                     <div className="border border-zinc-800 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-transparent hover:border-zinc-700 transition-all duration-150 text-center">
                       <div className="flex flex-col gap-1">
-                        <h3 className="text-xl font-black text-white text-center tracking-tight flex items-center justify-center gap-1.5"><Coins className="w-5 h-5 text-amber-400 fill-amber-400" /> 50</h3>
+                        <h3 className="text-xl font-black text-white text-center tracking-tight flex items-center justify-center gap-1.5"><Coins className="w-5 h-5 text-zinc-350 stroke-[2.2]" /> 50</h3>
                         <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center mt-1">Pacote Mini</p>
                         <p className="text-xs text-zinc-400 text-center mt-4 mb-6 leading-relaxed font-semibold px-2">Perfeito para testar e dar primeiras gorjetas.</p>
                       </div>
@@ -355,7 +370,7 @@ function App() {
                     {/* Starter - R$10 */}
                     <div className="border border-zinc-800 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-transparent hover:border-zinc-700 transition-all duration-150 text-center">
                       <div className="flex flex-col gap-1">
-                        <h3 className="text-xl font-black text-white text-center tracking-tight flex items-center justify-center gap-1.5"><Coins className="w-5 h-5 text-amber-400 fill-amber-400" /> 100</h3>
+                        <h3 className="text-xl font-black text-white text-center tracking-tight flex items-center justify-center gap-1.5"><Coins className="w-5 h-5 text-zinc-350 stroke-[2.2]" /> 100</h3>
                         <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center mt-1">Pacote Starter</p>
                         <p className="text-xs text-zinc-400 text-center mt-4 mb-6 leading-relaxed font-semibold px-2">Ideal para começar e fazer posts simples.</p>
                       </div>
@@ -371,13 +386,13 @@ function App() {
                     </div>
 
                     {/* Pro */}
-                    <div className="border border-sky-500/20 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-sky-950/5 hover:border-sky-500/40 transition-all duration-150 text-center relative overflow-hidden">
-                      <div className="absolute top-0 right-0 bg-sky-500 px-3 py-1 rounded-bl-xl">
+                    <div className="border border-zinc-500 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-zinc-900/20 hover:border-zinc-400 transition-all duration-150 text-center relative overflow-hidden">
+                      <div className="absolute top-0 right-0 bg-white px-3 py-1 rounded-bl-xl">
                         <span className="text-[9px] font-black uppercase tracking-wider text-black">Popular</span>
                       </div>
                       <div className="flex flex-col gap-1 mt-4">
-                        <h3 className="text-2xl font-black text-white text-center tracking-tight flex items-center justify-center gap-1.5"><Coins className="w-6 h-6 text-amber-400 fill-amber-400" /> 500</h3>
-                        <p className="text-[10px] font-black text-sky-400 uppercase tracking-widest text-center mt-1">Pacote Pro</p>
+                        <h3 className="text-2xl font-black text-white text-center tracking-tight flex items-center justify-center gap-1.5"><Coins className="w-6 h-6 text-zinc-350 stroke-[2.2]" /> 500</h3>
+                        <p className="text-[10px] font-black text-zinc-300 uppercase tracking-widest text-center mt-1">Pacote Pro</p>
                         <p className="text-xs text-zinc-400 text-center mt-4 mb-6 leading-relaxed font-semibold px-2">Perfeito para usuários ativos no feed.</p>
                       </div>
                       <div className="mt-auto flex flex-col gap-3">
@@ -394,7 +409,7 @@ function App() {
                     {/* Whale */}
                     <div className="border border-zinc-800 rounded-3xl p-5 flex flex-col justify-between gap-6 bg-transparent hover:border-zinc-700 transition-all duration-150 text-center">
                       <div className="flex flex-col gap-1">
-                        <h3 className="text-3xl font-black text-white text-center tracking-tight flex items-center justify-center gap-1.5"><Coins className="w-7 h-7 text-amber-400 fill-amber-400" /> 1000</h3>
+                        <h3 className="text-3xl font-black text-white text-center tracking-tight flex items-center justify-center gap-1.5"><Coins className="w-7 h-7 text-zinc-350 stroke-[2.2]" /> 1000</h3>
                         <p className="text-[10px] font-black text-white uppercase tracking-widest text-center mt-1">Pacote Whale</p>
                         <p className="text-xs text-zinc-400 text-center mt-4 mb-6 leading-relaxed font-semibold px-2">Para quem quer apoiar ao máximo a nossa rede.</p>
                       </div>
@@ -486,17 +501,6 @@ function App() {
           {/* Profile Tab */}
           {activeTab === 'profile' && (
             <div className="flex-1 min-h-screen border-r border-zinc-800 bg-black min-w-0 flex flex-col">
-              {/* Logout header */}
-              <div className="sticky top-0 z-30 bg-black/80 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex items-center justify-between shrink-0">
-                <h2 className="text-lg font-black tracking-tight text-white">Perfil</h2>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-zinc-800 text-xs font-bold text-zinc-400 hover:text-white hover:border-zinc-700 transition-all cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Sair</span>
-                </button>
-              </div>
               <ProfilePage
                 session={session}
                 profile={profile}
@@ -506,6 +510,9 @@ function App() {
                   setProfile(updated);
                   if (updated.credits !== undefined) setBalance(updated.credits);
                 }}
+                viewingUserId={viewingUserId}
+                onBack={() => setViewingUserId(null)}
+                onLogout={handleLogout}
               />
             </div>
           )}
@@ -513,7 +520,10 @@ function App() {
         </main>
 
         {/* Right Sidebar */}
-        <RightSidebar />
+        <RightSidebar
+          currentUserId={session?.uid || null}
+          onUserClick={navigateToProfile}
+        />
       </div>
 
       {/* Persistent Toast Notifications */}

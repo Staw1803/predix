@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { TrendingUp, Mail, Lock } from 'lucide-react';
+import { generateUniqueUsername } from '../utils';
 
 interface AuthProps {
   onLoginSimulated: () => void;
@@ -42,7 +43,7 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
 
         // 2. Initialize Firestore user document
         const baseUsername = email.split('@')[0];
-        const usernameVal = baseUsername.startsWith('@') ? baseUsername : `@${baseUsername}`;
+        const usernameVal = await generateUniqueUsername(baseUsername);
         await setDoc(doc(db, 'users', user.uid), {
           id: user.uid,
           username: usernameVal,

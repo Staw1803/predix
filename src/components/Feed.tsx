@@ -16,6 +16,7 @@ interface FeedProps {
   currentUser: User | null;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
   onSeedReady?: (fn: () => Promise<void>) => void;
+  onUserClick?: (userId: string) => void;
 }
 
 const FAKE_USERS = [
@@ -49,7 +50,7 @@ const FAKE_POSTS = [
   'Bora crescer juntos aqui no Predix! Deixa seu @usuario abaixo 👇',
 ];
 
-export default function Feed({ currentUser, setToast, onSeedReady }: FeedProps) {
+export default function Feed({ currentUser, setToast, onSeedReady, onUserClick }: FeedProps) {
   const [posts, setPosts] = useState<(Post & { authorName?: string; authorHandle?: string; authorAvatar?: string; monetized?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<any | null>(null);
@@ -234,6 +235,7 @@ export default function Feed({ currentUser, setToast, onSeedReady }: FeedProps) 
               onCommentClick={setSelectedPost}
               onTip={handleTip}
               currentUserId={currentUser?.id}
+              onUserClick={onUserClick}
             />
           ))
         )}
@@ -250,10 +252,20 @@ export default function Feed({ currentUser, setToast, onSeedReady }: FeedProps) 
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               <div className="flex gap-3.5 border-b border-zinc-900 pb-6">
-                <img src={selectedPost.authorAvatar || 'https://i.pravatar.cc/150?img=1'} alt="" className="w-10 h-10 rounded-full object-cover border border-zinc-800 shrink-0" />
+                <img 
+                  src={selectedPost.authorAvatar || 'https://i.pravatar.cc/150?img=1'} 
+                  alt="" 
+                  onClick={() => { setSelectedPost(null); onUserClick?.(selectedPost.authorId); }}
+                  className="w-10 h-10 rounded-full object-cover border border-zinc-800 shrink-0 cursor-pointer" 
+                />
                 <div className="flex-1 text-left min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                    <span className="font-bold text-white text-sm">{selectedPost.authorName || 'Usuário'}</span>
+                    <span 
+                      onClick={() => { setSelectedPost(null); onUserClick?.(selectedPost.authorId); }}
+                      className="font-bold text-white text-sm hover:underline cursor-pointer"
+                    >
+                      {selectedPost.authorName || 'Usuário'}
+                    </span>
                     <span className="text-zinc-500 text-xs">{selectedPost.authorHandle || '@usuario'}</span>
                   </div>
                   <p className="text-zinc-200 text-base leading-relaxed whitespace-pre-wrap break-words">{selectedPost.content}</p>
@@ -268,14 +280,24 @@ export default function Feed({ currentUser, setToast, onSeedReady }: FeedProps) 
                 ) : (
                   comments.map((c) => (
                     <div key={c.id} className="flex gap-3 text-left">
-                      <img src={c.authorAvatar || `https://i.pravatar.cc/150?u=${c.authorId}`} alt="" className="w-8 h-8 rounded-full object-cover border border-zinc-800 shrink-0" />
+                      <img 
+                        src={c.authorAvatar || `https://i.pravatar.cc/150?u=${c.authorId}`} 
+                        alt="" 
+                        onClick={() => { setSelectedPost(null); onUserClick?.(c.authorId); }}
+                        className="w-8 h-8 rounded-full object-cover border border-zinc-800 shrink-0 cursor-pointer" 
+                      />
                       <div className="flex-1 bg-zinc-900/40 border border-zinc-900 rounded-2xl p-3 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="font-bold text-white text-xs truncate max-w-[120px]">{c.authorName}</span>
+                            <span 
+                              onClick={() => { setSelectedPost(null); onUserClick?.(c.authorId); }}
+                              className="font-bold text-white text-xs truncate max-w-[120px] hover:underline cursor-pointer"
+                            >
+                              {c.authorName}
+                            </span>
                             <span className="text-zinc-500 text-[10px] truncate max-w-[100px]">{c.authorHandle}</span>
                           </div>
-                          <span className="text-zinc-600 text-[10px] shrink-0">
+                          <span className="text-zinc-655 text-[10px] shrink-0">
                             {c.timestamp ? (c.timestamp.toDate ? c.timestamp.toDate() : new Date(c.timestamp)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'agora'}
                           </span>
                         </div>
