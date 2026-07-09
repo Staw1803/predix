@@ -315,6 +315,34 @@ function App() {
   const activeHandle = profile?.username ? (profile.username.startsWith('@') ? profile.username : `@${profile.username}`) : (session ? `@${session.email.split('@')[0]}` : '@usuario');
   const activeAvatar = profile?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
 
+  // Maintenance Mode Override (Change to false to put the site back online)
+  const IS_MAINTENANCE_MODE = true;
+
+  if (IS_MAINTENANCE_MODE) {
+    return (
+      <div className="min-h-screen w-full bg-black text-zinc-100 flex flex-col items-center justify-center p-6 select-none">
+        <div className="flex flex-col items-center gap-6 max-w-sm text-center">
+          <img 
+            src="/logo.png" 
+            alt="Predix Logo" 
+            className="h-24 w-auto rounded-xl invert brightness-[2] contrast-[1.1] animate-pulse"
+          />
+          <div className="flex flex-col gap-2">
+            <h1 className="text-lg font-black tracking-widest text-white uppercase">PREDIX ESTÁ OFFLINE</h1>
+            <p className="text-[10px] text-zinc-500 font-extrabold uppercase tracking-wider">Manutenção & Blindagem de Segurança</p>
+          </div>
+          <p className="text-xs text-zinc-400 font-semibold leading-relaxed">
+            Estamos aplicando atualizações críticas na nossa infraestrutura de segurança para proteger as contas e as transações do site.
+          </p>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+            Voltamos em alguns minutos
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Strict Auth Redirection Lock
   if (!session) {
     return <Auth setToast={setToast} />;
