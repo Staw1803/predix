@@ -191,7 +191,7 @@ function App() {
     }
   };
 
-  // 13. Store / Checkout Handlers (Efí Bank Pix)
+  // 13. Store / Checkout Handlers (Asaas Pix)
   const handleSelectStorePackage = async (pkg: { name: string; coins: number; price: number }) => {
     setLoadingPix(true);
     setCheckoutPackage(null);
@@ -222,14 +222,14 @@ function App() {
           txid: data.txid
         });
         setTimeLeft(900); // Reset countdown to 15 mins
-        setToast({ message: 'PIX gerado via Efí Bank!', type: 'success' });
+        setToast({ message: 'PIX gerado com Asaas!', type: 'success' });
       } else {
-        throw new Error(data.error || 'Falha ao processar pagamento com a Efí');
+        throw new Error(data.error || 'Falha ao processar pagamento com o Asaas');
       }
     } catch (err: any) {
       console.error('Checkout network/API error:', err);
       setToast({ 
-        message: `Erro no Checkout: ${err.message || 'Falha de conexão com a Efí.'}`, 
+        message: `Erro no Checkout: ${err.message || 'Falha de conexão com o Asaas.'}`, 
         type: 'error' 
       });
     } finally {
@@ -264,7 +264,7 @@ function App() {
       });
     }, 1000);
 
-    // B. Polling Interval (checks payment status in Efí every 5 seconds)
+    // B. Polling Interval (checks payment status in Asaas every 5 seconds)
     const pollInterval = setInterval(async () => {
       try {
         const idToken = await auth.currentUser?.getIdToken();

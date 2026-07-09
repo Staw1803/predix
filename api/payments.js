@@ -1,4 +1,3 @@
-import EfiPay from 'sdk-node-apis-efi';
 import { verifyFirebaseToken } from './_utils.js';
 
 export default async function handler(req, res) {
@@ -19,8 +18,8 @@ export default async function handler(req, res) {
   // 1. Secure Route: Verify User Authentication Token
   try {
     const authHeader = req.headers['authorization'];
-    const apiKey = process.env.VITE_FIREBASE_API_KEY;
-    await verifyFirebaseToken(authHeader, apiKey);
+    const apiKeyFirebase = process.env.VITE_FIREBASE_API_KEY;
+    await verifyFirebaseToken(authHeader, apiKeyFirebase);
   } catch (authError) {
     res.status(401).json({ error: authError.message || "Unauthorized" });
     return;
@@ -34,71 +33,115 @@ export default async function handler(req, res) {
       return;
     }
 
-    const client_id = process.env.VITE_EFI_CLIENT_ID;
-    const client_secret = process.env.VITE_EFI_CLIENT_SECRET;
-    const cert_base64 = process.env.VITE_EFI_CERTIFICATE_BASE64;
-    const isSandbox = process.env.VITE_EFI_SANDBOX !== 'false';
-    const pixKey = process.env.VITE_EFI_PIX_KEY || 'sandbox-pix-key@efi.com.br';
+    // Read Asaas credentials
+    const asaasApiKey = process.env.ASAAS_API_KEY || '89db5943-51f1-41e6-8f5b-1c31bcc36b1c';
+    
+    // Auto-detect environment based on key prefix
+    const isSandbox = asaasApiKey.startsWith('$aact_hmlg_') || asaasApiKey.startsWith('$');
+    const baseUrl = isSandbox ? 'https://api-sandbox.asaas.com/v3' : 'https://api.asaas.com/v3';
 
-    if (!client_id || !client_secret) {
-      throw new Error("Missing Efí Bank environment keys.");
+    // 2. Find or Create Default Customer "Cliente Predix"
+    let customerId = null;
+    const searchUrl = `${baseUrl}/customers?name=${encodeURIComponent('Cliente Predix')}`;
+    const searchRes = await fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        'access_token': asaasApiKey,
+        'Content-Type': 'application/json',
+        'User-Agent': 'PredixApp'
+      }
+    });
+
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      if (searchData.data && searchData.data.length > 0) {
+        customerId = searchData.data[0].id;
+      }
     }
 
-    // Convert to String BRL format (e.g. "10.00")
-    const formattedAmount = Number(transaction_amount).toFixed(2);
+    // Create customer if not found
+    if (!customerId) {
+      const createCustRes = await fetch(`${baseUrl}/customers`, {
+        method: 'POST',
+        headers: {
+          'access_token': asaasApiKey,
+          'Content-Type': 'application/json',
+          'User-Agent': 'PredixApp'
+        },
+        body: JSON.stringify({
+          name: 'Cliente Predix',
+          email: 'cliente@predix.com'
+        })
+      });
 
-    // Efi Pay options
-    const options = {
-      sandbox: isSandbox,
-      client_id: client_id,
-      client_secret: client_secret,
-      certificate: isSandbox ? '' : (cert_base64 || ''),
-      cert_base64: isSandbox ? false : !!cert_base64
+      if (!createCustRes.ok) {
+        const errDetails = await createCustRes.text();
+        throw new Error(`Failed to create default Asaas customer: ${errDetails}`);
+      }
+
+      const newCustData = await createCustRes.json();
+      customerId = newCustData.id;
+    }
+
+    // 3. Create Asaas Payment (billingType: PIX)
+    // dueDate is set to tomorrow's date
+    const tomorrowDate = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    
+    const paymentBody = {
+      customer: customerId,
+      billingType: 'PIX',
+      value: Number(transaction_amount),
+      dueDate: tomorrowDate,
+      description: description || 'Recarga de moedas Predix'
     };
 
-    let responseData = null;
+    const createPayRes = await fetch(`${baseUrl}/payments`, {
+      method: 'POST',
+      headers: {
+        'access_token': asaasApiKey,
+        'Content-Type': 'application/json',
+        'User-Agent': 'PredixApp'
+      },
+      body: JSON.stringify(paymentBody)
+    });
 
-    try {
-      const efipay = new EfiPay(options);
-      
-      const body = {
-        calendario: { expiracao: 3600 },
-        valor: { original: formattedAmount },
-        chave: pixKey,
-        solicitacaoPagador: description || 'Recarga de moedas'
-      };
-
-      const charge = await efipay.pixCreateImmediateCharge({}, body);
-      
-      if (charge && charge.loc && charge.loc.id) {
-        const qrCodeData = await efipay.pixGenerateQRCode({ id: charge.loc.id });
-        if (qrCodeData && qrCodeData.qrcode) {
-          responseData = {
-            txid: charge.txid || `efiRealPix${Date.now()}`,
-            qrCodeImage: qrCodeData.imagemQrcode,
-            pixCopiaECola: qrCodeData.qrcode
-          };
-        }
-      }
-    } catch (sdkError) {
-      console.warn("Efí SDK Sandbox call failed. Falling back to error display.", sdkError);
-      
-      let errorDetail = sdkError.message || "";
-      try {
-        errorDetail = JSON.stringify(sdkError);
-      } catch (e) {}
-
-      const errorMessage = `Erro Efí: ${errorDetail}. Verifique as credenciais, o certificado Base64 e se a chave Pix está cadastrada no Efí Bank.`;
-      
-      return res.status(200).json({
-        txid: `efiSandboxPix${Date.now()}`, // Still return mock txid so polling doesn't break
-        qrCodeImage: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(errorMessage)}`,
-        pixCopiaECola: errorMessage
-      });
+    if (!createPayRes.ok) {
+      const errDetails = await createPayRes.text();
+      throw new Error(`Failed to create Asaas charge: ${errDetails}`);
     }
 
-    res.status(200).json(responseData);
+    const paymentData = await createPayRes.json();
+    const paymentId = paymentData.id;
+
+    // 4. Retrieve Pix Copy/Paste code & base64 image
+    const qrCodeUrl = `${baseUrl}/payments/${paymentId}/pixQrCode`;
+    const qrCodeRes = await fetch(qrCodeUrl, {
+      method: 'GET',
+      headers: {
+        'access_token': asaasApiKey,
+        'Content-Type': 'application/json',
+        'User-Agent': 'PredixApp'
+      }
+    });
+
+    if (!qrCodeRes.ok) {
+      const errDetails = await qrCodeRes.text();
+      throw new Error(`Failed to generate Asaas Pix QR Code: ${errDetails}`);
+    }
+
+    const qrCodeData = await qrCodeRes.json();
+    
+    // Return formatted payload matching the frontend requirements
+    res.status(200).json({
+      txid: paymentId,
+      qrCodeImage: qrCodeData.encodedImage.startsWith('data:') 
+        ? qrCodeData.encodedImage 
+        : `data:image/png;base64,${qrCodeData.encodedImage}`,
+      pixCopiaECola: qrCodeData.payload
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Asaas Payment charge creation error:", error);
+    res.status(500).json({ error: error.message || "Failed to create Asaas Pix charge." });
   }
 }

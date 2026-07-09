@@ -1,4 +1,3 @@
-import EfiPay from 'sdk-node-apis-efi';
 import { verifyFirebaseToken } from './_utils.js';
 
 export default async function handler(req, res) {
@@ -19,8 +18,8 @@ export default async function handler(req, res) {
   // 1. Secure Route: Verify User Authentication Token
   try {
     const authHeader = req.headers['authorization'];
-    const apiKey = process.env.VITE_FIREBASE_API_KEY;
-    await verifyFirebaseToken(authHeader, apiKey);
+    const apiKeyFirebase = process.env.VITE_FIREBASE_API_KEY;
+    await verifyFirebaseToken(authHeader, apiKeyFirebase);
   } catch (authError) {
     res.status(401).json({ error: authError.message || "Unauthorized" });
     return;
@@ -34,41 +33,42 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Mock handler (auto-completes after 15 seconds for sandbox demo validation)
-    if (txid.startsWith('efiSandboxPix')) {
-      const timestampPart = parseInt(txid.replace('efiSandboxPix', ''), 10);
-      const secondsPassed = (Date.now() - timestampPart) / 1000;
-      
-      if (secondsPassed >= 15) {
-        res.status(200).json({ status: 'CONCLUIDA' });
-      } else {
-        res.status(200).json({ status: 'ATIVA' });
+    // Read Asaas credentials
+    const asaasApiKey = process.env.ASAAS_API_KEY || '89db5943-51f1-41e6-8f5b-1c31bcc36b1c';
+    
+    // Auto-detect environment based on key prefix
+    const isSandbox = asaasApiKey.startsWith('$aact_hmlg_') || asaasApiKey.startsWith('$');
+    const baseUrl = isSandbox ? 'https://api-sandbox.asaas.com/v3' : 'https://api.asaas.com/v3';
+
+    // Query Asaas payment status
+    const searchUrl = `${baseUrl}/payments/${txid}`;
+    const statusRes = await fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        'access_token': asaasApiKey,
+        'Content-Type': 'application/json',
+        'User-Agent': 'PredixApp'
       }
-      return;
+    });
+
+    if (!statusRes.ok) {
+      const errDetails = await statusRes.text();
+      throw new Error(`Failed to fetch Asaas payment status: ${errDetails}`);
     }
 
-    const client_id = process.env.VITE_EFI_CLIENT_ID;
-    const client_secret = process.env.VITE_EFI_CLIENT_SECRET;
-    const cert_base64 = process.env.VITE_EFI_CERTIFICATE_BASE64;
-    const isSandbox = process.env.VITE_EFI_SANDBOX !== 'false';
+    const paymentData = await statusRes.json();
+    
+    // Asaas Paid status values: PAID, CONFIRMED, RECEIVED, RECEIVED_VIA_PIX
+    const isPaid = ['RECEIVED', 'CONFIRMED', 'PAID', 'RECEIVED_VIA_PIX'].includes(paymentData.status);
 
-    if (!client_id || !client_secret) {
-      throw new Error("Missing Efí Bank environment keys.");
+    if (isPaid) {
+      res.status(200).json({ status: 'CONCLUIDA' });
+    } else {
+      res.status(200).json({ status: 'ATIVA' });
     }
 
-    const options = {
-      sandbox: isSandbox,
-      client_id: client_id,
-      client_secret: client_secret,
-      certificate: isSandbox ? '' : (cert_base64 || ''),
-      cert_base64: isSandbox ? false : !!cert_base64
-    };
-
-    const efipay = new EfiPay(options);
-    const charge = await efipay.pixDetailCharge({ txid });
-
-    res.status(200).json({ status: charge.status });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Asaas Payment status checking error:", error);
+    res.status(500).json({ error: error.message || "Failed to check Asaas payment status." });
   }
 }
