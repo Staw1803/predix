@@ -320,25 +320,9 @@ function App() {
 
   if (IS_MAINTENANCE_MODE) {
     return (
-      <div className="min-h-screen w-full bg-black text-zinc-100 flex flex-col items-center justify-center p-6 select-none">
-        <div className="flex flex-col items-center gap-6 max-w-sm text-center">
-          <img 
-            src="/logo.png" 
-            alt="Predix Logo" 
-            className="h-24 w-auto rounded-xl invert brightness-[2] contrast-[1.1] animate-pulse"
-          />
-          <div className="flex flex-col gap-2">
-            <h1 className="text-lg font-black tracking-widest text-white uppercase">PREDIX ESTÁ OFFLINE</h1>
-            <p className="text-[10px] text-zinc-500 font-extrabold uppercase tracking-wider">Manutenção & Blindagem de Segurança</p>
-          </div>
-          <p className="text-xs text-zinc-400 font-semibold leading-relaxed">
-            Estamos aplicando atualizações críticas na nossa infraestrutura de segurança para proteger as contas e as transações do site.
-          </p>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-            Voltamos em alguns minutos
-          </div>
-        </div>
+      <div className="min-h-screen w-full bg-black text-zinc-100 flex flex-col items-center justify-center p-6 select-none font-sans">
+        <h1 className="text-base font-black tracking-widest text-white uppercase mb-1">PREDIX ESTÁ OFFLINE</h1>
+        <p className="text-[10px] text-zinc-550 font-extrabold uppercase tracking-widest">MANUTENÇÃO</p>
       </div>
     );
   }
