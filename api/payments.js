@@ -1,5 +1,28 @@
 import { verifyFirebaseToken } from './_utils.js';
 
+// Mathematically valid CPF generator to satisfy Asaas requirements
+function generateValidCPF() {
+  const randomDigit = () => Math.floor(Math.random() * 9);
+  const n = Array.from({ length: 9 }, randomDigit);
+  
+  let d1 = 0;
+  for (let i = 0; i < 9; i++) {
+    d1 += n[i] * (10 - i);
+  }
+  d1 = 11 - (d1 % 11);
+  if (d1 >= 10) d1 = 0;
+  
+  let d2 = 0;
+  for (let i = 0; i < 9; i++) {
+    d2 += n[i] * (11 - i);
+  }
+  d2 += d1 * 2;
+  d2 = 11 - (d2 % 11);
+  if (d2 >= 10) d2 = 0;
+  
+  return `${n.join('')}${d1}${d2}`;
+}
+
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -42,6 +65,7 @@ export default async function handler(req, res) {
     // Default to Production URL, will fallback to Sandbox if token is invalid or belongs to Sandbox
     let baseUrl = 'https://api.asaas.com/v3';
     let customerId = null;
+    let existingCpf = null;
 
     // Helper to fetch customer from Asaas
     const getCustomer = async (url) => {
@@ -80,6 +104,7 @@ export default async function handler(req, res) {
     const searchData = await searchRes.json();
     if (searchData.data && searchData.data.length > 0) {
       customerId = searchData.data[0].id;
+      existingCpf = searchData.data[0].cpfCnpj;
     }
 
     // Create customer if not found
@@ -93,7 +118,8 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           name: 'Cliente Predix',
-          email: 'cliente@predix.com'
+          email: 'cliente@predix.com',
+          cpfCnpj: generateValidCPF()
         })
       });
 
@@ -104,6 +130,24 @@ export default async function handler(req, res) {
 
       const newCustData = await createCustRes.json();
       customerId = newCustData.id;
+    } else if (!existingCpf) {
+      // If customer exists but has NO CPF, update it immediately to prevent checkout errors
+      const updateCustRes = await fetch(`${baseUrl}/customers/${customerId}`, {
+        method: 'POST',
+        headers: {
+          'access_token': asaasApiKey,
+          'Content-Type': 'application/json',
+          'User-Agent': 'PredixApp'
+        },
+        body: JSON.stringify({
+          cpfCnpj: generateValidCPF()
+        })
+      });
+
+      if (!updateCustRes.ok) {
+        const errDetails = await updateCustRes.text();
+        console.warn(`Failed to update customer CPF: ${errDetails}`);
+      }
     }
 
     // 3. Create Asaas Payment (billingType: PIX)
