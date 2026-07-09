@@ -24,13 +24,12 @@ export default function Sidebar({ credits, activeTab, setActiveTab, username, us
     <aside className="fixed md:sticky bottom-0 md:top-0 left-0 w-full md:h-screen md:w-64 border-t md:border-t-0 md:border-r border-zinc-800 bg-black flex md:flex-col justify-between md:justify-between px-2 py-2 md:p-4 z-40">
       <div className="flex md:flex-col gap-2 md:gap-6 w-full">
         {/* Brand logo - hidden on mobile */}
-        <div className="hidden md:flex items-center gap-3 px-2 py-3">
-          <div className="bg-white p-2 rounded-full">
-            <TrendingUp className="text-black w-5 h-5 stroke-[3]" />
-          </div>
-          <span className="font-black text-xl tracking-tight text-white">
-            PREDIX
-          </span>
+        <div className="hidden md:flex items-center gap-3 px-2 py-3 select-none">
+          <img 
+            src="/logo.png" 
+            alt="Predix Logo" 
+            className="h-12 w-auto rounded-xl invert brightness-[2] contrast-[1.1]"
+          />
         </div>
 
         {/* Credits Badge - hidden on mobile */}

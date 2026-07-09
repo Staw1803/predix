@@ -8,7 +8,7 @@ import {
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { TrendingUp, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react';
 import { generateUniqueUsername } from '../utils';
 
 interface AuthProps {
@@ -102,11 +102,12 @@ export default function Auth({ setToast }: AuthProps) {
       <div className="w-full max-w-md flex flex-col gap-8">
         
         {/* Brand Logo Header */}
-        <div className="flex items-center gap-3 justify-center">
-          <div className="bg-white p-2.5 rounded-full shrink-0">
-            <TrendingUp className="text-black w-6 h-6 stroke-[3]" />
-          </div>
-          <h1 className="font-black text-2xl tracking-wider text-white">PREDIX</h1>
+        <div className="flex items-center justify-center select-none mb-2">
+          <img 
+            src="/logo.png" 
+            alt="Predix Logo" 
+            className="h-20 w-auto rounded-xl invert brightness-[2] contrast-[1.1]"
+          />
         </div>
 
         {/* Firebase Config warning */}
