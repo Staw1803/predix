@@ -78,9 +78,9 @@ export default function Sidebar({ credits, activeTab, setActiveTab, username, us
           alt={username}
           className="w-9 h-9 rounded-full object-cover border border-zinc-800 shrink-0"
         />
-        <div className="hidden md:flex flex-col text-left">
-          <span className="font-bold text-white text-sm truncate max-w-[100px]">{username}</span>
-          <span className="text-zinc-500 text-xs font-mono truncate max-w-[100px]">{userHandle}</span>
+        <div className="hidden md:flex flex-col text-left flex-1 min-w-0">
+          <span className="font-bold text-white text-sm truncate block">{username}</span>
+          <span className="text-zinc-550 text-xs font-mono truncate block">{userHandle}</span>
         </div>
       </div>
     </aside>

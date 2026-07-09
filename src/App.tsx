@@ -29,7 +29,6 @@ function App() {
   // Firebase Session States
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [isOfflineSandbox, setIsOfflineSandbox] = useState<boolean>(false);
 
   // App States (credits are hard-frozen to 0)
   const [balance, setBalance] = useState<number>(0); 
@@ -67,7 +66,6 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setSession(user);
-        setIsOfflineSandbox(false);
       } else {
         setSession(null);
         setProfile(null);
@@ -157,27 +155,16 @@ function App() {
     }
   }, [session]);
 
-  // Initial local sandbox loads when offline
-  useEffect(() => {
-    if (isOfflineSandbox) {
-      setBalance(0);
-    }
-  }, [isOfflineSandbox]);
+
 
 
   // 12. Logout Handler
   const handleLogout = async () => {
-    if (!isOfflineSandbox) {
-      try {
-        await signOut(auth);
-        setToast({ message: 'Logout efetuado com sucesso!', type: 'success' });
-      } catch (err: any) {
-        setToast({ message: `Erro ao sair: ${err.message}`, type: 'error' });
-      }
-    } else {
-      setSession(null);
-      setProfile(null);
-      setToast({ message: 'Logout efetuado (Modo Sandbox)!', type: 'success' });
+    try {
+      await signOut(auth);
+      setToast({ message: 'Logout efetuado com sucesso!', type: 'success' });
+    } catch (err: any) {
+      setToast({ message: `Erro ao sair: ${err.message}`, type: 'error' });
     }
   };
 
@@ -266,7 +253,7 @@ function App() {
             const addedCoins = Math.floor(checkoutPackage.price / MOEDA_VALOR_REAL);
             const finalBalance = balance + addedCoins;
 
-            if (!isOfflineSandbox && session?.uid) {
+            if (session?.uid) {
               const userRef = doc(db, 'users', session.uid);
               await updateDoc(userRef, { 
                 credits: finalBalance
@@ -291,16 +278,16 @@ function App() {
       clearInterval(timerInterval);
       clearInterval(pollInterval);
     };
-  }, [checkoutPackage, balance, session, isOfflineSandbox]);
+  }, [checkoutPackage, balance, session]);
 
   // Active User Identifiers
-  const activeName = profile?.displayName || (session ? session.displayName || session.email.split('@')[0] : 'UsuÃ¡rio');
+  const activeName = profile?.displayName || (session ? session.displayName || session.email.split('@')[0] : 'Usuário');
   const activeHandle = profile?.username ? (profile.username.startsWith('@') ? profile.username : `@${profile.username}`) : (session ? `@${session.email.split('@')[0]}` : '@usuario');
   const activeAvatar = profile?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
 
   // Strict Auth Redirection Lock
-  if (!session && !isOfflineSandbox) {
-    return <Auth onLoginSimulated={() => setIsOfflineSandbox(true)} setToast={setToast} />;
+  if (!session) {
+    return <Auth setToast={setToast} />;
   }
 
   return (

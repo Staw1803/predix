@@ -7,15 +7,14 @@ import {
   GoogleAuthProvider 
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { TrendingUp, Mail, Lock } from 'lucide-react';
+import { TrendingUp, Mail, Lock, AlertCircle } from 'lucide-react';
 import { generateUniqueUsername } from '../utils';
 
 interface AuthProps {
-  onLoginSimulated: () => void;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
-export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
+export default function Auth({ setToast }: AuthProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,10 +26,9 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
 
     if (!isFirebaseConfigured) {
       setToast({
-        message: 'Aviso: Usando login simulado. Credenciais do Firebase não configuradas.',
+        message: 'Erro: Firebase não configurado. Por favor configure o arquivo .env com suas chaves reais.',
         type: 'error',
       });
-      onLoginSimulated();
       return;
     }
 
@@ -71,10 +69,9 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
   const handleOAuthLogin = async () => {
     if (!isFirebaseConfigured) {
       setToast({
-        message: 'Simulação: Login com Google iniciado.',
-        type: 'success',
+        message: 'Erro: Firebase não configurado. Por favor configure o arquivo .env com suas chaves reais.',
+        type: 'error',
       });
-      onLoginSimulated();
       return;
     }
 
@@ -101,6 +98,17 @@ export default function Auth({ onLoginSimulated, setToast }: AuthProps) {
           </div>
           <h1 className="font-black text-2xl tracking-wider text-white">PREDIX</h1>
         </div>
+
+        {/* Firebase Config warning */}
+        {!isFirebaseConfigured && (
+          <div className="bg-red-950/20 border border-red-900/30 p-4 rounded-2xl text-red-400 text-xs font-bold leading-relaxed text-left flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-extrabold mb-0.5">Firebase não configurado!</p>
+              <p className="text-[11px] font-medium text-red-500">Adicione as chaves VITE_FIREBASE_API_KEY e demais parâmetros no seu arquivo .env local ou nas configurações da Vercel para ativar o login real.</p>
+            </div>
+          </div>
+        )}
 
         {/* Text Headers */}
         <div className="text-center md:text-left flex flex-col gap-2">
