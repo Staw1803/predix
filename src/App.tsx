@@ -156,6 +156,20 @@ function App() {
     }
   }, [session]);
 
+  // Trigger serverless bot activity in background (handled by server rate-limits)
+  useEffect(() => {
+    if (session) {
+      fetch('/api/cron-bot')
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            console.log("Bot automation completed successfully:", data.message);
+          }
+        })
+        .catch(err => console.error("Error triggering bot:", err));
+    }
+  }, [session]);
+
 
 
 

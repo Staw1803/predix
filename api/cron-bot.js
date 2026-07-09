@@ -4,6 +4,8 @@ import {
   collection, 
   addDoc, 
   getDocs, 
+  getDoc,
+  setDoc,
   doc, 
   updateDoc, 
   increment,
@@ -70,15 +72,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Security Check: Block unauthorized cron invokes
-  const hasCronHeader = req.headers['x-vercel-cron'] === '1';
-  const hasAuthHeader = req.headers['authorization'] === `Bearer ${process.env.CRON_SECRET}`;
-  
-  if (!hasCronHeader && !hasAuthHeader && process.env.NODE_ENV === 'production') {
-    res.status(401).json({ error: "Unauthorized cron invoke." });
-    return;
-  }
-
   try {
     const firebaseConfig = {
       apiKey: process.env.VITE_FIREBASE_API_KEY,
@@ -95,6 +88,27 @@ export default async function handler(req, res) {
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+
+    // Dynamic Server-Side Rate Limit: Prevent bot from running more than once every 20 minutes
+    const systemStatusRef = doc(db, 'system', 'status');
+    const statusSnap = await getDoc(systemStatusRef);
+    const nowTime = Date.now();
+
+    if (statusSnap.exists()) {
+      const lastRunTimestamp = statusSnap.data().lastBotRun?.toDate ? statusSnap.data().lastBotRun.toDate().getTime() : 0;
+      // 20 minutes = 20 * 60 * 1000 = 1200000 ms. Subtract a 30s buffer.
+      if (nowTime - lastRunTimestamp < 1170000) {
+        res.status(429).json({ 
+          status: "ignored", 
+          message: "Too early to run bot. Must wait 20 minutes between runs.",
+          timeLeftSeconds: Math.ceil((1170000 - (nowTime - lastRunTimestamp)) / 1000)
+        });
+        return;
+      }
+    }
+
+    // Update execution timestamp immediately in Firestore to lock database
+    await setDoc(systemStatusRef, { lastBotRun: new Date() }, { merge: true });
 
     // 1. Generate 10 random bot users
     const generatedBots = [];
@@ -153,14 +167,10 @@ export default async function handler(req, res) {
 
     if (existingPostsList.length > 0) {
       for (let i = 0; i < Math.min(6, existingPostsList.length); i++) {
-        // Pick a random post
         const randomPost = existingPostsList[Math.floor(Math.random() * existingPostsList.length)];
-        
-        // Pick a bot user to comment
         const commentingBot = generatedBots[Math.floor(Math.random() * generatedBots.length)];
         const commentContent = COMMENT_TEMPLATES[Math.floor(Math.random() * COMMENT_TEMPLATES.length)];
 
-        // Add comment
         await addDoc(collection(db, 'comments'), {
           postId: randomPost.id,
           authorId: commentingBot.id,
@@ -171,7 +181,6 @@ export default async function handler(req, res) {
           timestamp: new Date()
         });
 
-        // Increment commentsCount in post
         const postDocRef = doc(db, 'posts', randomPost.id);
         await updateDoc(postDocRef, {
           commentsCount: increment(1)
