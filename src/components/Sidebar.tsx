@@ -68,8 +68,8 @@ export default function Sidebar({ credits, activeTab, setActiveTab, username, us
           })}
         </nav>
 
-        {/* Seed Database — dev only */}
-        {isDev && onSeedDatabase && (
+        {/* Seed Database */}
+        {onSeedDatabase && (
           <button
             onClick={onSeedDatabase}
             className="w-full flex items-center justify-center md:justify-start gap-3 px-4 py-2.5 mt-1 rounded-full text-xs font-black text-rose-400 bg-rose-950/10 border border-rose-900/30 hover:bg-rose-950/20 cursor-pointer transition-all duration-150 shrink-0"
