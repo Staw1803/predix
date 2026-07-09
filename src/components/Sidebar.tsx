@@ -1,4 +1,4 @@
-import { Home, User, TrendingUp, ShoppingBag, Wallet, Database, Coins } from 'lucide-react';
+import { Home, User, TrendingUp, ShoppingBag, Wallet, Coins } from 'lucide-react';
 
 interface SidebarProps {
   credits: number;
@@ -7,10 +7,9 @@ interface SidebarProps {
   username: string;
   userHandle: string;
   userAvatar: string;
-  onSeedDatabase?: () => void;
 }
 
-export default function Sidebar({ credits, activeTab, setActiveTab, username, userHandle, userAvatar, onSeedDatabase }: SidebarProps) {
+export default function Sidebar({ credits, activeTab, setActiveTab, username, userHandle, userAvatar }: SidebarProps) {
   const menuItems = [
     { id: 'feed', name: 'Início', icon: Home },
     { id: 'store', name: 'Loja', icon: ShoppingBag },
@@ -36,11 +35,11 @@ export default function Sidebar({ credits, activeTab, setActiveTab, username, us
         {/* Credits Badge - hidden on mobile */}
         <div
           onClick={() => setActiveTab('wallet')}
-          className="hidden md:flex border border-zinc-800 rounded-full px-4 py-2 items-center justify-between gap-2 hover:bg-zinc-900 transition-all duration-200 shrink-0 cursor-pointer"
+          className="hidden md:flex border border-zinc-850 rounded-full px-4 py-2 items-center justify-between gap-2 hover:bg-zinc-900/40 backdrop-blur-sm transition-all duration-200 shrink-0 cursor-pointer"
         >
           <span className="text-zinc-500 font-bold text-xs inline">Créditos</span>
           <span className="text-white font-extrabold text-sm flex items-center gap-1.5">
-            <Coins className="w-4 h-4 text-amber-400 fill-amber-400" />
+            <Coins className="w-4 h-4 text-zinc-350 stroke-[2.2]" />
             <span>{credits.toLocaleString('pt-BR')}</span>
           </span>
         </div>
@@ -67,16 +66,6 @@ export default function Sidebar({ credits, activeTab, setActiveTab, username, us
           })}
         </nav>
 
-        {/* Seed Database */}
-        {onSeedDatabase && (
-          <button
-            onClick={onSeedDatabase}
-            className="hidden md:flex w-full items-center justify-start gap-3 px-4 py-2.5 mt-1 rounded-full text-xs font-black text-rose-400 bg-rose-950/10 border border-rose-900/30 hover:bg-rose-950/20 cursor-pointer transition-all duration-150 shrink-0"
-          >
-            <Database className="w-4 h-4 shrink-0 text-rose-400" />
-            <span className="hidden md:block">Gerar Dados Iniciais</span>
-          </button>
-        )}
       </div>
 
       {/* User Info - hidden on mobile */}

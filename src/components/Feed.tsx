@@ -3,7 +3,7 @@ import { db, isFirebaseConfigured } from '../firebaseClient';
 import {
   collection, addDoc, updateDoc, doc, onSnapshot,
   query, orderBy, where, increment, serverTimestamp,
-  writeBatch, getDocs
+  writeBatch
 } from 'firebase/firestore';
 import CreatePost from './CreatePost';
 import PostCard from './PostCard';
@@ -15,42 +15,89 @@ import { GORJETA_MOEDAS } from '../constants';
 interface FeedProps {
   currentUser: User | null;
   setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
-  onSeedReady?: (fn: () => Promise<void>) => void;
   onUserClick?: (userId: string) => void;
 }
 
-const FAKE_USERS = [
-  { displayName: 'Lucas Oliveira', username: 'lucas_oliv', photoURL: 'https://i.pravatar.cc/150?img=3' },
-  { displayName: 'Ana Clara Silva', username: 'anaclara_s', photoURL: 'https://i.pravatar.cc/150?img=5' },
-  { displayName: 'Pedro Henrique', username: 'pedrohenrique', photoURL: 'https://i.pravatar.cc/150?img=12' },
-  { displayName: 'Fernanda Rocha', username: 'fe_rocha', photoURL: 'https://i.pravatar.cc/150?img=9' },
-  { displayName: 'Rafael Costa', username: 'rafa_costa', photoURL: 'https://i.pravatar.cc/150?img=15' },
-  { displayName: 'Beatriz Mendes', username: 'bea_mendes', photoURL: 'https://i.pravatar.cc/150?img=25' },
-  { displayName: 'Thiago Souza', username: 'thiago_dv', photoURL: 'https://i.pravatar.cc/150?img=8' },
-  { displayName: 'Larissa Nunes', username: 'larissa_n', photoURL: 'https://i.pravatar.cc/150?img=47' },
-  { displayName: 'Mateus Lima', username: 'mateus_l', photoURL: 'https://i.pravatar.cc/150?img=32' },
-  { displayName: 'Isabela Torres', username: 'isa_torres', photoURL: 'https://i.pravatar.cc/150?img=44' },
+const FIRST_NAMES = ['Gabriel', 'Lucas', 'Matheus', 'Pedro', 'Thiago', 'Bruno', 'Felipe', 'Rafael', 'Diego', 'Rodrigo', 'Ana', 'Julia', 'Mariana', 'Beatriz', 'Fernanda', 'Amanda', 'Larissa', 'Camila', 'Juliana', 'Isabela', 'Sophia', 'Alice', 'Manuela', 'Laura', 'Heloisa', 'Arthur', 'Bernardo', 'Heitor', 'Davi', 'Lorenzo', 'Théo', 'Enzo', 'Nicolas', 'Henrique', 'Murilo', 'Lucca', 'Guilherme', 'Gustavo', 'Caio', 'Vinicius'];
+const LAST_NAMES = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues', 'Ferreira', 'Alves', 'Pereira', 'Lima', 'Gomes', 'Costa', 'Ribeiro', 'Martins', 'Carvalho', 'Almeida', 'Lopes', 'Soares', 'Dias', 'Vieira', 'Barbosa'];
+const BIO_TEMPLATES = [
+  'Trader esportivo & entusiasta Crypto 📉',
+  'Dev fullstack | apaixonado por mercados preditivos 💻',
+  'Apenas tentando adivinhar o futuro do Brasil 🔮',
+  'Fã de futebol, tecnologia e investimento anjo ⚽',
+  'Economista de dia, analista de tendências de noite 📊',
+  'Previsões são minha terapia 😂',
+  'Siga para as melhores calls de política e entretenimento ⚡'
+];
+const UNSPLASH_AVATARS = [
+  '1535713875002-d1d0cf377fde', '1494790108377-be9c29b29330', '1570295999919-56ceb5ecca61', '1507003211169-0a1dd7228f2d',
+  '1438761681033-6461ffad8d80', '1472099645785-5658abf4ff4e', '1544005313-94ddf0286df2', '1506794778202-cad84cf45f1d',
+  '1517841905240-472988babdf9', '1539571696357-5a69c17a67c6', '1522075469751-3a6694fb2f61', '1534528741775-53994a69daeb',
+  '1508214751196-bcfd4ca60f91', '1580489944761-15a19d654956', '1492562080023-ab3db95bfbce', '1488426862026-3ee34a7d66df',
+  '1501196354995-cbb51c65aaea', '1519085360753-af0119f7cbe7', '1489424122828-9865352413a3', '1513956589380-bad6acb9b9d4',
+  '1496440737103-cd596325d314', '1531746020798-e6953c6e8e04', '1500648767791-00dcc994a43e', '1548142813-c348350df52b',
+  '1560250097-0b93528c311a', '1554151228-14d9def656e4', '1537368910025-700350fe46c7', '1544725176-7c40e5a71c5e',
+  '1527980965255-d3b416303d12', '1583337130417-3346a1be7dee', '150425740623-013e6e83b711', '1566753323558-f4e0952af115',
+  '1568602471122-7832951cc4c5', '1619895862022-09114b41f16f', '1524504388940-b1c1722653e1', '1503185912284-5271ff81b9a8',
+  '1531123897727-8f129e1688ce', '1528892901404-74b87d3793c2', '1558203728-00f45181dd84', '1500048993953-d23a436266cf',
+  '1599566150163-29194dcaad36', '1542206395-9ebd3e6c1797', '1519345182560-3f2917c472ef', '1509305711191-441779f4578f',
+  '1502823403129-14027a7c6c1f', '1546969415-95748a4392df', '1534751516642-a131ffa10b27', '1508214501196-bcfd4ca60f91',
+  '1487412720507-e7ab37603c6f', '1520813792240-56fc4a3765a7'
+];
+const POST_TEMPLATES = [
+  "Será que o Flamengo ganha o campeonato este ano? 🔴⚫",
+  "O Bitcoin vai passar de $100k este mês? O que vocês acham? 🚀",
+  "Previsão de hoje: chuva à tarde e alta do dólar... 💸",
+  "Alguém aí já comprou moedas no Predix hoje?",
+  "A inteligência artificial vai substituir os programadores ou só ajudar? 💻",
+  "Melhor plataforma de mercado preditivo que já usei, muito rápida!",
+  "Quem ganha as eleições americanas? Deixem seus palpites!",
+  "O Pix mudou completamente o comércio no Brasil. Sem taxas é perfeito! 🇧🇷",
+  "Gastei minhas moedas apostando no Real Madrid kkkkk 🤡",
+  "O segredo do sucesso é a consistência. Bom dia grupo!",
+  "Qual a melhor cripto para investir abaixo de $1 atualmente?",
+  "Predix tá com uma interface muito bonita, estilo X. Gostei do minimalismo.",
+  "Acabei de fazer meu primeiro saque! Caiu na conta em segundos ⚡",
+  "Alguém aceita um palpite sobre a rodada do Brasileirão?",
+  "Taxa de juros vai cair ou subir na próxima reunião do Copom?",
+  "A comunidade aqui é muito engajada, gosto de ler as respostas.",
+  "Quem é o melhor jogador de futebol da atualidade? Vini Jr?",
+  "Não operem alavancado hoje, o mercado está muito volátil! ⚠️",
+  "Estudando desenvolvimento web com React. Alguma dica para iniciantes?",
+  "Hoje o dia promete! Vamos fazer algumas previsões de futebol.",
+  "Se o Pix da Efí falhar eu choro, mas até agora tudo 100% kkkk",
+  "Qual o seu maior palpite que deu certo na vida?",
+  "Quem aí já testou a funcionalidade de seguir perfis?",
+  "Achei o perfil do @lucas_oliv, o cara só dá palpite certeiro!",
+  "Mais um dia de análises e previsões no Predix Social.",
+  "Será que a taxa de conversão de moedas vai continuar fixa?",
+  "Gorjetas monetizadas são o futuro da criação de conteúdo.",
+  "Deixei 50 moedas de gorjeta num post de análise excelente.",
+  "Quem ganha o clássico de domingo? Meu palpite é empate.",
+  "Trabalhando remoto e acompanhando o feed do Predix. ☕",
+  "Amanhã tem lançamento espacial da SpaceX. Ansioso!",
+  "Qual o melhor livro de economia que você já leu?",
+  "Alguém com problemas de saldo? O meu zerou mas já carreguei via Pix.",
+  "Esse design em preto e branco ficou muito chique, estilo X mesmo.",
+  "Não troco o Predix por nenhuma outra rede social atualmente.",
+  "Quem aí acertou a previsão do preço do Ethereum?",
+  "Apenas observando as discussões sobre política no feed 👀",
+  "Hoje tem jogo do Brasil! Palpites de placar?",
+  "Investir em conhecimento rende sempre os melhores juros.",
+  "Alguém aí querendo comprar moedas? Os pacotes estão ótimos.",
+  "Fazendo posts monetizados para ver se ganho umas gorjetas kkk",
+  "O Pix copia e cola da loja é muito prático.",
+  "Esperando a alta das altcoins... Algum dia vem! 💎",
+  "Minha meta é bater 1000 seguidores esta semana, me sigam!",
+  "Muito bom ver a plataforma crescendo e novos usuários entrando.",
+  "Qual o palpite mais louco que você já viu darem aqui?",
+  "Quem ganha a Champions League este ano? City ou Real?",
+  "Tudo pronto para as previsões do final de semana.",
+  "Predix Social é o futuro dos mercados preditivos no Brasil! 🚀🚀",
+  "Seja bem-vindo quem está entrando hoje! Me segue aí!"
 ];
 
-const FAKE_POSTS = [
-  'Acabei de entrar no Predix! Essa rede social tem um visual absurdo demais. 🔥',
-  'Quem mais aqui usa PIX pra tudo? Sinceramente facilitou muito minha vida.',
-  'Boa tarde, Predix! Trabalhando de casa hoje e aproveitando pra dar uma olhadinha no feed. 😎',
-  'A inteligência artificial está mudando tudo. E o Predix vai mudar a forma de se conectar.',
-  'Postando pelo celular pela primeira vez. Interface muito fluida, parabéns aos devs!',
-  'Será que alguém me segue de volta? 👀 Seguindo todo mundo aqui.',
-  'Que tal a gente marcar uma live aqui no Predix semana que vem?',
-  'Tecnologia, inovação e PIX. Tá aí o trio do futuro do Brasil. 💚💛',
-  'Acabei de receber minha primeira gorjeta aqui no Predix! Valeu demais! 💛',
-  'Todo dia é um ótimo dia pra aprender algo novo. O que vocês estão estudando hoje?',
-  'Minha chave PIX está ativa e pronta pra receber aquele Predix coin 😂',
-  'Primeira semana no Predix e já me sinto em casa. Comunidade boa demais.',
-  'O futuro das redes sociais é a monetização descentralizada. Predix tá na frente!',
-  'Quem mais tá viciado nesse feed? rsrs',
-  'Bora crescer juntos aqui no Predix! Deixa seu @usuario abaixo 👇',
-];
-
-export default function Feed({ currentUser, setToast, onSeedReady, onUserClick }: FeedProps) {
+export default function Feed({ currentUser, setToast, onUserClick }: FeedProps) {
   const [posts, setPosts] = useState<(Post & { authorName?: string; authorHandle?: string; authorAvatar?: string; monetized?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPost, setSelectedPost] = useState<any | null>(null);
@@ -58,50 +105,66 @@ export default function Feed({ currentUser, setToast, onSeedReady, onUserClick }
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
 
-  const handleSeedDatabase = async () => {
-    if (!isFirebaseConfigured) { setToast({ message: 'Firebase não configurado.', type: 'error' }); return; }
+  const performAutoSeed = async () => {
     try {
-      const existingSnap = await getDocs(collection(db, 'posts'));
-      if (existingSnap.size >= 10) {
-        setToast({ message: 'Banco já possui dados. Apague os posts primeiro.', type: 'error' });
-        return;
-      }
-      setToast({ message: 'Gerando dados iniciais...', type: 'success' });
+      console.log('Database empty! Triggering automatic seed of 50 users and 50 posts...');
       const batch1 = writeBatch(db);
-      const ids: string[] = [];
-      for (const user of FAKE_USERS) {
+      const createdUserIds: string[] = [];
+      const generatedUsersData: any[] = [];
+
+      for (let i = 0; i < 50; i++) {
         const ref = doc(collection(db, 'users'));
-        batch1.set(ref, {
-          displayName: user.displayName, username: user.username, photoURL: user.photoURL,
-          credits: Math.floor(Math.random() * 500) * 10, bio: 'Usuário do Predix Social 🚀', 
-          followersCount: Math.floor(Math.random() * 1500), followingCount: Math.floor(Math.random() * 800),
+        const firstName = FIRST_NAMES[i % FIRST_NAMES.length];
+        const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+        const displayName = `${firstName} ${lastName}`;
+        const username = `@${firstName.toLowerCase()}_${lastName.toLowerCase()}${Math.floor(Math.random() * 90 + 10)}`;
+        const photoURL = `https://images.unsplash.com/photo-${UNSPLASH_AVATARS[i % UNSPLASH_AVATARS.length]}?auto=format&fit=crop&w=150&q=80`;
+        const bio = BIO_TEMPLATES[Math.floor(Math.random() * BIO_TEMPLATES.length)];
+        const followersCount = Math.floor(Math.random() * 2000 + 100);
+        const followingCount = Math.floor(Math.random() * 800 + 50);
+
+        const userData = {
+          id: ref.id,
+          displayName,
+          username,
+          photoURL,
+          bio,
+          followersCount,
+          followingCount,
+          credits: Math.floor(Math.random() * 300) * 10,
           createdAt: serverTimestamp()
-        });
-        ids.push(ref.id);
+        };
+
+        batch1.set(ref, userData);
+        createdUserIds.push(ref.id);
+        generatedUsersData.push(userData);
       }
       await batch1.commit();
+
       const batch2 = writeBatch(db);
-      for (let i = 0; i < FAKE_POSTS.length; i++) {
-        const ui = i % FAKE_USERS.length;
+      for (let i = 0; i < 50; i++) {
         const ref = doc(collection(db, 'posts'));
+        const userIndex = i % 50;
+        const author = generatedUsersData[userIndex];
+        const content = POST_TEMPLATES[i % POST_TEMPLATES.length];
+
         batch2.set(ref, {
-          authorId: ids[ui] || 'seed', authorName: FAKE_USERS[ui].displayName,
-          authorHandle: `@${FAKE_USERS[ui].username}`, authorAvatar: FAKE_USERS[ui].photoURL,
-          content: FAKE_POSTS[i], monetized: Math.random() > 0.4, // 60% of posts monetized
-          timestamp: serverTimestamp(), likesCount: Math.floor(Math.random() * 120)
+          authorId: author.id,
+          authorName: author.displayName,
+          authorHandle: author.username,
+          authorAvatar: author.photoURL,
+          content,
+          monetized: Math.random() > 0.4,
+          likesCount: Math.floor(Math.random() * 200 + 10),
+          timestamp: serverTimestamp()
         });
       }
       await batch2.commit();
-      setToast({ message: '✅ 10 usuários e 15 posts gerados!', type: 'success' });
-    } catch (err: any) {
-      setToast({ message: `Erro: ${err.message}`, type: 'error' });
+      console.log('✅ Auto Seed Completed!');
+    } catch (err) {
+      console.error('Error during auto seed:', err);
     }
   };
-
-  useEffect(() => {
-    if (onSeedReady) onSeedReady(handleSeedDatabase);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -119,9 +182,14 @@ export default function Feed({ currentUser, setToast, onSeedReady, onUserClick }
       return;
     }
     const q = query(collection(db, 'posts'), orderBy('timestamp', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
-      setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+    const unsub = onSnapshot(q, async (snap) => {
+      const postsList = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+      setPosts(postsList);
       setLoading(false);
+
+      if (snap.empty) {
+        await performAutoSeed();
+      }
     }, (err) => {
       console.error(err);
       setToast({ message: 'Erro ao ler posts.', type: 'error' });

@@ -52,6 +52,8 @@ export default function ProfilePage({ session, profile, balance, setToast, onPro
   const [isFollowing, setIsFollowing] = useState(false);
   const [loadingFollow, setLoadingFollow] = useState(false);
 
+  const [avatarError, setAvatarError] = useState(false);
+
   const uid = session?.uid;
   const isOwnProfile = !viewingUserId || viewingUserId === uid;
 
@@ -67,8 +69,17 @@ export default function ProfilePage({ session, profile, balance, setToast, onPro
     ? (currentAvatar || profile?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80')
     : (viewedProfile?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80');
 
+  const bio = isOwnProfile
+    ? (profile?.bio || '')
+    : (viewedProfile?.bio || '');
+
+  const avatarSrc = avatarError || !avatar
+    ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=27272a&color=fff&size=150`
+    : avatar;
+
   // Fetch visited profile from db
   useEffect(() => {
+    setAvatarError(false); // Reset error state on profile change
     if (isOwnProfile) {
       setViewedProfile(profile);
       setFollowersCount(profile?.followersCount || 0);
@@ -178,16 +189,15 @@ export default function ProfilePage({ session, profile, balance, setToast, onPro
   // After crop completes
   const handleCropComplete = async (url: string) => {
     setCropSrc(null);
-    setCurrentAvatar(url);
-    // Persist immediately if editing, otherwise queue for save
-    if (uid && isFirebaseConfigured) {
-      try {
-        await updateDoc(doc(db, 'users', uid), { photoURL: url });
-        onProfileUpdate({ ...profile, photoURL: url });
-        setToast({ message: 'Foto de perfil atualizada!', type: 'success' });
-      } catch (err: any) {
-        setToast({ message: `Erro ao salvar foto: ${err.message}`, type: 'error' });
-      }
+    if (!uid) return;
+    try {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, { photoURL: url });
+      setCurrentAvatar(url);
+      onProfileUpdate({ ...profile, photoURL: url });
+      setToast({ message: 'Foto de perfil atualizada!', type: 'success' });
+    } catch (err: any) {
+      setToast({ message: `Erro ao salvar foto: ${err.message}`, type: 'error' });
     }
   };
 
@@ -276,7 +286,7 @@ export default function ProfilePage({ session, profile, balance, setToast, onPro
   return (
     <div className="flex-1 min-h-screen border-r border-zinc-800 bg-black min-w-0">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-black/85 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex items-center justify-between shrink-0">
+      <div className="sticky top-0 z-30 bg-black/85 backdrop-blur-md border-b border-zinc-850 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           {!isOwnProfile && onBack && (
             <button onClick={onBack} className="text-zinc-400 hover:text-white p-1.5 rounded-full hover:bg-zinc-900 cursor-pointer">
@@ -284,7 +294,7 @@ export default function ProfilePage({ session, profile, balance, setToast, onPro
             </button>
           )}
           <h2 className="text-lg font-black tracking-tight text-white text-left">
-            {isOwnProfile ? 'Perfil' : (viewedProfile?.displayName || 'Perfil')}
+            {isOwnProfile ? 'Perfil' : (displayName || 'Perfil')}
           </h2>
         </div>
         {isOwnProfile && onLogout && (
@@ -310,24 +320,26 @@ export default function ProfilePage({ session, profile, balance, setToast, onPro
 
       <div className="p-4 flex flex-col gap-5 max-w-2xl">
         {/* Profile Card */}
-        <div className="border border-zinc-800 rounded-3xl overflow-hidden bg-transparent">
+        <div className="border border-zinc-850 rounded-3xl overflow-hidden bg-zinc-950/20 backdrop-blur-sm">
           {/* Cover banner */}
-          <div className="h-20 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 relative" />
+          <div className="h-32 bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 relative border-b border-zinc-900/60" />
 
           {/* Avatar + Edit Row */}
           <div className="px-5 pb-5">
+            <div className="flex items-end justify-between -mt-12 mb-4 w-full">
               {/* Avatar image */}
-              <div className="relative group">
+              <div className="relative group shrink-0">
                 <img
-                  src={avatar}
+                  src={avatarSrc}
                   alt={displayName}
-                  className="w-20 h-20 rounded-full object-cover border-4 border-black shadow-xl"
+                  className="w-24 h-24 rounded-full object-cover border-4 border-black bg-zinc-900 shadow-2xl"
+                  onError={() => setAvatarError(true)}
                 />
                 {isOwnProfile && (
                   <>
                     <button
                       onClick={() => avatarInputRef.current?.click()}
-                      className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer animate-fade-in"
                     >
                       <Camera className="w-5 h-5 text-white" />
                     </button>
@@ -342,59 +354,63 @@ export default function ProfilePage({ session, profile, balance, setToast, onPro
                 )}
               </div>
 
-              {isOwnProfile ? (
-                !editing ? (
-                  <button
-                    onClick={() => setEditing(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-700 text-xs font-black text-white hover:bg-zinc-900 cursor-pointer transition-all"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    Editar Perfil
-                  </button>
+              {/* Action Button aligned to the right */}
+              <div className="flex items-center gap-2 mb-1">
+                {isOwnProfile ? (
+                  !editing ? (
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-800 text-xs font-black text-white hover:bg-zinc-900 cursor-pointer transition-all active:scale-95 bg-zinc-950/40 hover:border-zinc-700"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
+                      Editar Perfil
+                    </button>
+                  ) : (
+                    <button onClick={() => setEditing(false)} className="text-xs font-bold text-zinc-500 hover:text-white cursor-pointer transition-colors px-3 py-1.5 rounded-full border border-zinc-900 hover:bg-zinc-950 bg-transparent">Cancelar</button>
+                  )
                 ) : (
-                  <button onClick={() => setEditing(false)} className="text-xs text-zinc-500 hover:text-white cursor-pointer">Cancelar</button>
-                )
-              ) : (
-                <button
-                  onClick={handleFollowToggle}
-                  disabled={loadingFollow}
-                  className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer active:scale-95 ${
-                    isFollowing 
-                      ? 'border border-zinc-700 text-white bg-transparent hover:bg-red-950/20 hover:border-red-900 hover:text-red-500' 
-                      : 'bg-white text-black hover:bg-zinc-200'
-                  }`}
-                >
-                  {loadingFollow ? '...' : isFollowing ? 'Seguindo' : 'Seguir'}
-                </button>
-              )}
+                  <button
+                    onClick={handleFollowToggle}
+                    disabled={loadingFollow}
+                    className={`px-4 py-2 rounded-full text-xs font-black transition-all cursor-pointer active:scale-95 ${
+                      isFollowing 
+                        ? 'border border-zinc-750 text-white bg-transparent hover:bg-red-950/10 hover:border-red-900 hover:text-red-500' 
+                        : 'bg-white text-black hover:bg-zinc-200'
+                    }`}
+                  >
+                    {loadingFollow ? '...' : isFollowing ? 'Seguindo' : 'Seguir'}
+                  </button>
+                )}
+              </div>
+            </div>
 
             {!editing ? (
               <>
                 <div className="flex flex-col gap-0.5 text-left">
                   <h3 className="text-xl font-black text-white leading-tight">{displayName}</h3>
-                  <span className="text-zinc-500 text-sm font-mono">{handle}</span>
+                  <span className="text-zinc-500 text-xs font-mono">{handle}</span>
                 </div>
 
-                {profile?.bio && (
-                  <p className="text-zinc-300 text-sm leading-relaxed mt-3 text-left">{profile.bio}</p>
+                {bio && (
+                  <p className="text-zinc-300 text-xs leading-relaxed mt-3.5 text-left font-medium opacity-90">{bio}</p>
                 )}
 
                 {/* Stats row */}
-                <div className="flex items-center gap-5 mt-4 pt-4 border-t border-zinc-900">
-                  <div className="flex items-center gap-1.5 text-left">
+                <div className="flex items-center gap-5 mt-4 pt-4 border-t border-zinc-900/60">
+                  <div className="flex items-center gap-1 text-left opacity-90 hover:opacity-100 transition-opacity">
                     <span className="text-white font-black text-sm">{followersCount.toLocaleString('pt-BR')}</span>
-                    <span className="text-zinc-500 text-xs font-semibold">Seguidores</span>
+                    <span className="text-zinc-550 text-xs font-semibold">Seguidores</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-left">
+                  <div className="flex items-center gap-1 text-left opacity-90 hover:opacity-100 transition-opacity">
                     <span className="text-white font-black text-sm">{followingCount.toLocaleString('pt-BR')}</span>
-                    <span className="text-zinc-500 text-xs font-semibold">Seguindo</span>
+                    <span className="text-zinc-550 text-xs font-semibold">Seguindo</span>
                   </div>
                   {isOwnProfile && (
-                    <div className="flex items-center gap-1.5 text-left ml-auto">
-                      <span className="text-zinc-200 font-bold text-sm flex items-center gap-1.5">
-                        <Coins className="w-4 h-4 text-zinc-300 stroke-[2.2]" /> {balance.toLocaleString('pt-BR')}
+                    <div className="flex items-center gap-1.5 text-left ml-auto bg-zinc-900/40 border border-zinc-850 px-3 py-1 rounded-full">
+                      <span className="text-zinc-250 font-bold text-xs flex items-center gap-1.5">
+                        <Coins className="w-3.5 h-3.5 text-zinc-350 stroke-[2.2]" /> {balance.toLocaleString('pt-BR')}
                       </span>
-                      <span className="text-zinc-500 text-xs font-semibold">≈ R$ {brlValue}</span>
+                      <span className="text-zinc-550 text-[10px] font-semibold">≈ R$ {brlValue}</span>
                     </div>
                   )}
                 </div>

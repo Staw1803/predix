@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Feed from './components/Feed';
 import RightSidebar from './components/RightSidebar';
@@ -9,7 +9,7 @@ import ProfilePage from './components/ProfilePage';
 
 import { auth, db, isFirebaseConfigured } from './firebaseClient';
 import { MOEDA_VALOR_REAL } from './constants';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, getRedirectResult } from 'firebase/auth';
 import { generateUniqueUsername } from './utils';
 import { 
   doc, 
@@ -29,7 +29,7 @@ function App() {
   // Firebase Session States
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [isOfflineSandbox, setIsOfflineSandbox] = useState<boolean>(!isFirebaseConfigured);
+  const [isOfflineSandbox, setIsOfflineSandbox] = useState<boolean>(false);
 
   // App States (credits are hard-frozen to 0)
   const [balance, setBalance] = useState<number>(0); 
@@ -55,11 +55,7 @@ function App() {
   const [copiedPix, setCopiedPix] = useState<boolean>(false);
   const [timeLeft, setTimeLeft] = useState<number>(900); // 15 minutes (900 seconds)
 
-  // Seed DB function ref (exposed by Feed via callback)
-  const seedFnRef = useRef<(() => Promise<void>) | null>(null);
-  const handleSeedDatabase = async () => {
-    if (seedFnRef.current) await seedFnRef.current();
-  };
+
 
 
 
@@ -67,6 +63,7 @@ function App() {
   useEffect(() => {
     if (!isFirebaseConfigured) return;
 
+    // A. Auth state changes
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setSession(user);
@@ -76,6 +73,34 @@ function App() {
         setProfile(null);
       }
     });
+
+    // B. Handle OAuth Redirect Returns
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
+          const user = result.user;
+          const userRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(userRef);
+          
+          if (!docSnap.exists()) {
+            const baseVal = user.displayName || user.email?.split('@')[0] || 'user';
+            const usernameVal = await generateUniqueUsername(baseVal);
+            const initialProfile = {
+              id: user.uid,
+              username: usernameVal,
+              displayName: user.displayName || baseVal,
+              photoURL: user.photoURL || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80`,
+              credits: 0
+            };
+            await setDoc(userRef, initialProfile);
+            setProfile(initialProfile);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Error handling redirect result:', err);
+        setToast({ message: `Erro no login Google: ${err.message}`, type: 'error' });
+      });
 
     return () => unsubscribe();
   }, []);
@@ -290,7 +315,6 @@ function App() {
           username={activeName}
           userHandle={activeHandle}
           userAvatar={activeAvatar}
-          onSeedDatabase={handleSeedDatabase}
         />
 
         {/* Center Main Scroll Container */}
@@ -307,7 +331,6 @@ function App() {
                 credits: balance
               } : null}
               setToast={setToast}
-              onSeedReady={(fn) => { seedFnRef.current = fn; }}
               onUserClick={navigateToProfile}
             />
           )}
