@@ -34,9 +34,12 @@ export default async function handler(req, res) {
     }
 
     // Read Asaas credentials
-    const asaasApiKey = process.env.ASAAS_API_KEY || '89db5943-51f1-41e6-8f5b-1c31bcc36b1c';
+    const asaasApiKey = process.env.ASAAS_API_KEY;
+    if (!asaasApiKey) {
+      throw new Error("Missing ASAAS_API_KEY environment variable. Please configure it in your Vercel settings.");
+    }
     
-    // Default to Production URL, will fallback to Sandbox if token is invalid on Production
+    // Default to Production URL, will fallback to Sandbox if token is invalid or belongs to Sandbox
     let baseUrl = 'https://api.asaas.com/v3';
     let customerId = null;
 
@@ -58,9 +61,11 @@ export default async function handler(req, res) {
     if (!searchRes.ok) {
       const cloneRes = searchRes.clone();
       const errData = await cloneRes.json().catch(() => ({}));
-      const isInvalidToken = errData.errors && errData.errors.some(e => e.code === 'invalid_access_token');
+      const needsFallback = errData.errors && errData.errors.some(e => 
+        e.code === 'invalid_access_token' || e.code === 'invalid_environment'
+      );
       
-      if (isInvalidToken) {
+      if (needsFallback) {
         // Fallback: Try Sandbox environment
         baseUrl = 'https://api-sandbox.asaas.com/v3';
         searchRes = await getCustomer(baseUrl);
